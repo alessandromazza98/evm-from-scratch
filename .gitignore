@@ -1,2 +1,3 @@
 .DS_Store
 rust/target
+.vscode
