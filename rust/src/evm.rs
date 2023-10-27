@@ -1,4 +1,4 @@
-use crate::opcode::OpCode;
+use crate::{opcode::OpCode, utility::push_x};
 use primitive_types::U256;
 
 pub struct Evm {
@@ -27,18 +27,16 @@ impl Evm {
 
     pub fn transact(&mut self, pc: &mut usize, opcode: OpCode) -> ExecutionResult {
         match opcode {
-            OpCode::STOP => ExecutionResult::Halt,
-            OpCode::PUSH0 => {
+            OpCode::Stop => ExecutionResult::Halt,
+            OpCode::Push0 => {
                 self.stack.push(0.into());
                 *pc += 1;
                 ExecutionResult::Success
             }
-            OpCode::PUSH1 => {
-                let push_data = self.code[*pc + 1];
-                self.stack.push(push_data.into());
-                *pc += 2;
-                ExecutionResult::Success
-            }
+            OpCode::Push1 => push_x(1, pc, &mut self.stack, self.code.as_ref()),
+            OpCode::Push2 => push_x(2, pc, &mut self.stack, self.code.as_ref()),
+            OpCode::Push4 => push_x(4, pc, &mut self.stack, self.code.as_ref()),
+            OpCode::Push6 => push_x(6, pc, &mut self.stack, self.code.as_ref()),
         }
     }
 

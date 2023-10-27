@@ -1,6 +1,7 @@
 mod evm;
 mod opcode;
-use evm::Evm;
+mod utility;
+use evm::{Evm, ExecutionResult};
 use primitive_types::U256;
 use std::boxed::Box;
 
@@ -10,16 +11,24 @@ pub struct EvmResult {
 }
 
 pub fn evm(_code: impl AsRef<[u8]>) -> EvmResult {
-    let mut stack: Vec<U256> = Vec::new();
-    let mut pc = 0;
     let code = _code.as_ref();
 
-    let mut evm = Evm::new(Box::from(code), stack);
+    let mut evm = Evm::new(Box::from(code), Vec::new());
 
-    evm.execute();
+    let result = evm.execute();
 
-    EvmResult {
-        stack: evm.stack(),
-        success: true,
+    match result {
+        ExecutionResult::Success => EvmResult {
+            stack: evm.stack(),
+            success: true,
+        },
+        ExecutionResult::Revert => EvmResult {
+            stack: evm.stack(),
+            success: false,
+        },
+        ExecutionResult::Halt => EvmResult {
+            stack: evm.stack(),
+            success: true,
+        },
     }
 }

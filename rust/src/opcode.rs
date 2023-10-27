@@ -1,7 +1,10 @@
 pub enum OpCode {
-    STOP = 0,
-    PUSH0 = 95,
-    PUSH1 = 96,
+    Stop = 0,
+    Push0 = 95,
+    Push1 = 96,
+    Push2 = 97,
+    Push4 = 99,
+    Push6 = 101,
 }
 
 impl TryFrom<u8> for OpCode {
@@ -9,9 +12,12 @@ impl TryFrom<u8> for OpCode {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(OpCode::STOP),
-            95 => Ok(OpCode::PUSH0),
-            96 => Ok(OpCode::PUSH1),
+            0 => Ok(OpCode::Stop),
+            95 => Ok(OpCode::Push0),
+            96 => Ok(OpCode::Push1),
+            97 => Ok(OpCode::Push2),
+            99 => Ok(OpCode::Push4),
+            101 => Ok(OpCode::Push6),
             _ => Err("Unknown opcode".to_string()),
         }
     }
