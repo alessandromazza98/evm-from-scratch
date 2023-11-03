@@ -25,6 +25,14 @@ opcodes! {
     Push2(97),
     Push4(99),
     Push6(101),
+    Push10(105),
+    Push11(106),
+    Push32(127),
+    Pop(80),
+    Add(1),
+    Mul(2),
+    Sub(3),
+    Div(4),
 }
 
 impl OpCode {
