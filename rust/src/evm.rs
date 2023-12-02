@@ -1,25 +1,32 @@
 use crate::{
+    errors::ExecutionError,
     opcode::OpCode,
-    utility::{add, div, mul, pop_x, push_x, sub},
+    utility::{add, div, mod_fn, mul, pop, push, push_data, sub},
 };
 use primitive_types::U256;
 
 pub struct Evm {
     code: Box<[u8]>,
     stack: Vec<U256>,
+    limit: usize,
 }
 
 impl Evm {
-    pub fn new(code: Box<[u8]>, stack: Vec<U256>) -> Self {
-        Self { code, stack }
+    pub fn new(code: Box<[u8]>, stack: Vec<U256>, limit: usize) -> Self {
+        Self { code, stack, limit }
     }
 
     pub fn execute(&mut self) -> ExecutionResult {
         let mut pc = 0;
         while pc < self.code.len() {
             if let Some(opcode) = OpCode::new(self.code[pc]) {
-                if let ExecutionResult::Halt = self.transact(&mut pc, opcode) {
-                    return ExecutionResult::Halt;
+                match self.transact(&mut pc, opcode) {
+                    Ok(_) => {
+                        // move the pc to the next instruction
+                        pc += 1;
+                    }
+                    Err(ExecutionError::Halt) => return ExecutionResult::Halt,
+                    Err(_) => return ExecutionResult::Revert,
                 }
             } else {
                 return ExecutionResult::Revert;
@@ -28,26 +35,51 @@ impl Evm {
         ExecutionResult::Success
     }
 
-    pub fn transact(&mut self, pc: &mut usize, opcode: OpCode) -> ExecutionResult {
+    pub fn transact(&mut self, pc: &mut usize, opcode: OpCode) -> Result<(), ExecutionError> {
         match opcode {
-            OpCode::Stop => ExecutionResult::Halt,
+            OpCode::Stop => Err(ExecutionError::Halt),
             OpCode::Push0 => {
                 self.stack.push(0.into());
-                *pc += 1;
-                ExecutionResult::Success
+                Ok(())
             }
-            OpCode::Push1 => push_x(1, pc, &mut self.stack, self.code.as_ref()),
-            OpCode::Push2 => push_x(2, pc, &mut self.stack, self.code.as_ref()),
-            OpCode::Push4 => push_x(4, pc, &mut self.stack, self.code.as_ref()),
-            OpCode::Push6 => push_x(6, pc, &mut self.stack, self.code.as_ref()),
-            OpCode::Push10 => push_x(10, pc, &mut self.stack, self.code.as_ref()),
-            OpCode::Push11 => push_x(11, pc, &mut self.stack, self.code.as_ref()),
-            OpCode::Push32 => push_x(32, pc, &mut self.stack, self.code.as_ref()),
-            OpCode::Pop => pop_x(1, pc, &mut self.stack),
-            OpCode::Add => add(pc, &mut self.stack),
-            OpCode::Mul => mul(pc, &mut self.stack),
-            OpCode::Sub => sub(pc, &mut self.stack),
-            OpCode::Div => div(pc, &mut self.stack),
+            OpCode::Push1
+            | OpCode::Push2
+            | OpCode::Push4
+            | OpCode::Push6
+            | OpCode::Push10
+            | OpCode::Push11
+            | OpCode::Push32 => {
+                let start = *pc + 1;
+                let push_data_size = opcode.push_data_size();
+                let push_data = push_data(push_data_size, &self.code, start)?;
+                push(&mut self.stack, push_data, self.limit)?;
+                *pc += push_data_size;
+                Ok(())
+            }
+            OpCode::Pop => {
+                pop(&mut self.stack)?;
+                Ok(())
+            }
+            OpCode::Add => {
+                add(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Mul => {
+                mul(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Sub => {
+                sub(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Div => {
+                div(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Mod => {
+                mod_fn(&mut self.stack, self.limit)?;
+                Ok(())
+            }
         }
     }
 

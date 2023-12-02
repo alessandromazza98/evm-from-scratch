@@ -33,6 +33,7 @@ opcodes! {
     Mul(2),
     Sub(3),
     Div(4),
+    Mod(6),
 }
 
 impl OpCode {
@@ -41,6 +42,20 @@ impl OpCode {
             Some(opcode)
         } else {
             None
+        }
+    }
+
+    /// Helper function to determine the push data size for each `Push`` opcode
+    pub fn push_data_size(&self) -> usize {
+        match self {
+            OpCode::Push1 => 1,
+            OpCode::Push2 => 2,
+            OpCode::Push4 => 4,
+            OpCode::Push6 => 6,
+            OpCode::Push10 => 10,
+            OpCode::Push11 => 11,
+            OpCode::Push32 => 32,
+            _ => 0, // return 0 for non-`PUSH` opcodes
         }
     }
 }

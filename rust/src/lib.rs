@@ -1,3 +1,4 @@
+mod errors;
 mod evm;
 mod opcode;
 mod utility;
@@ -12,8 +13,9 @@ pub struct EvmResult {
 
 pub fn evm(_code: impl AsRef<[u8]>) -> EvmResult {
     let code = _code.as_ref();
+    let limit = 1024;
 
-    let mut evm = Evm::new(Box::from(code), Vec::new());
+    let mut evm = Evm::new(Box::from(code), Vec::new(), limit);
 
     let result = evm.execute();
 
