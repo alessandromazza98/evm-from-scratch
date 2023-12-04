@@ -69,31 +69,41 @@ pub fn div(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> 
     let a = pop(stack)?;
     let b = pop(stack)?;
 
-    if b == 0.into() {
-        // if denominator is 0, returns 0.
-        let div = 0.into();
-        push(stack, div, limit)?;
-        Ok(0.into())
-    } else {
-        // we don't care if it overflows. EVM simply wraps around.
-        let (div, _) = a.div_mod(b);
-        push(stack, div, limit)?;
-        Ok(div)
-    }
+    let div = a.checked_div(b).unwrap_or(0.into());
+    push(stack, div, limit)?;
+    Ok(div)
 }
 
 pub fn mod_fn(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
     let a = pop(stack)?;
     let b = pop(stack)?;
 
-    if b == 0.into() {
-        // if the denominator is 0, the result will be 0.
-        let result = 0.into();
-        push(stack, result, limit)?;
-        Ok(0.into())
-    } else {
-        let result = a % b;
-        push(stack, result, limit)?;
-        Ok(result)
+    let result = a.checked_rem(b).unwrap_or(0.into());
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn addmod(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let _ = add(stack, limit)?;
+    mod_fn(stack, limit)
+}
+
+pub fn mulmod(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let a = pop(stack)?;
+    let b = pop(stack)?;
+    let n = pop(stack)?;
+
+    let mul = a.full_mul(b);
+    match mul.checked_rem(n.into()) {
+        Some(result) => {
+            let result = result.try_into().unwrap_or(0.into());
+            push(stack, result, limit)?;
+            Ok(result)
+        }
+        None => {
+            let result = 0.into();
+            push(stack, result, limit)?;
+            Ok(result)
+        }
     }
 }

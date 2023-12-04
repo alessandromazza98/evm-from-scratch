@@ -34,6 +34,8 @@ opcodes! {
     Sub(3),
     Div(4),
     Mod(6),
+    Addmod(8),
+    Mulmod(9),
 }
 
 impl OpCode {

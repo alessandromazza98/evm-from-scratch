@@ -1,7 +1,7 @@
 use crate::{
     errors::ExecutionError,
     opcode::OpCode,
-    utility::{add, div, mod_fn, mul, pop, push, push_data, sub},
+    utility::{add, addmod, div, mod_fn, mul, mulmod, pop, push, push_data, sub},
 };
 use primitive_types::U256;
 
@@ -78,6 +78,14 @@ impl Evm {
             }
             OpCode::Mod => {
                 mod_fn(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Addmod => {
+                addmod(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Mulmod => {
+                mulmod(&mut self.stack, self.limit)?;
                 Ok(())
             }
         }

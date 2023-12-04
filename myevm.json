@@ -1,0 +1,16 @@
+[
+    {
+        "name": "MULMOD (wrapped)",
+        "code": {
+            "asm": "PUSH1 12\nPUSH32 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\nPUSH32 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\nMULMOD",
+            "bin": "600c7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff09"
+        },
+        "expect": {
+            "stack": [
+                "0x9"
+            ],
+            "success": true
+        },
+        "hint": ""
+    }
+]
