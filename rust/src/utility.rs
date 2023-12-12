@@ -107,3 +107,163 @@ pub fn mulmod(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionErro
         }
     }
 }
+
+pub fn exp(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let a = pop(stack)?;
+    let exponent = pop(stack)?;
+
+    let (result, _) = a.overflowing_pow(exponent);
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn sign_extend(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let b = pop(stack)?;
+    let x = pop(stack)?;
+
+    let sign_byte = x.byte(b.as_usize());
+
+    // convert U256 to a little-endian byte array
+    let mut data = [0u8; 32];
+    x.to_little_endian(&mut data);
+
+    for i in 0..32 {
+        if i as usize > b.as_usize() {
+            if sign_byte > 0x7f {
+                data[i] = 0xFF;
+            } else {
+                data[i] = 0x00;
+            }
+        }
+    }
+
+    // convert the modified byte array back to U256
+    let result = U256::from_little_endian(&data);
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn sdiv(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let mut a = pop(stack)?;
+    let mut b = pop(stack)?;
+
+    let is_a_negative = a.bit(255);
+    let is_b_negative = b.bit(255);
+
+    if is_a_negative {
+        (a, _) = a.overflowing_neg();
+    }
+
+    if is_b_negative {
+        (b, _) = b.overflowing_neg();
+    }
+
+    let mut result = a.checked_div(b).unwrap_or(0.into());
+
+    if is_a_negative != is_b_negative {
+        (result, _) = result.overflowing_neg();
+    }
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn smod(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let mut a = pop(stack)?;
+    let mut b = pop(stack)?;
+
+    let is_a_negative = a.bit(255);
+    let is_b_negative = b.bit(255);
+
+    if is_a_negative {
+        (a, _) = a.overflowing_neg();
+    }
+
+    if is_b_negative {
+        (b, _) = b.overflowing_neg();
+    }
+
+    let mut result = a.checked_rem(b).unwrap_or(0.into());
+
+    if is_a_negative && is_b_negative {
+        (result, _) = result.overflowing_neg();
+    }
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn lt(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let a = pop(stack)?;
+    let b = pop(stack)?;
+
+    let result = a < b;
+    let result = match result {
+        true => 1.into(),
+        false => 0.into(),
+    };
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn gt(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let a = pop(stack)?;
+    let b = pop(stack)?;
+
+    let result = a > b;
+    let result = match result {
+        true => 1.into(),
+        false => 0.into(),
+    };
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn slt(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let a = pop(stack)?;
+    let b = pop(stack)?;
+
+    let is_a_negative = a.bit(255);
+    let is_b_negative = b.bit(255);
+
+    let result = match (is_a_negative, is_b_negative) {
+        (true, true) => !(a.overflowing_neg() <= b.overflowing_neg()),
+        (true, false) => true,
+        (false, true) => false,
+        (false, false) => a < b,
+    };
+
+    let result = match result {
+        true => 1.into(),
+        false => 0.into(),
+    };
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn sgt(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let a = pop(stack)?;
+    let b = pop(stack)?;
+
+    let is_a_negative = a.bit(255);
+    let is_b_negative = b.bit(255);
+
+    let result = match (is_a_negative, is_b_negative) {
+        (true, true) => !(a.overflowing_neg() >= b.overflowing_neg()),
+        (true, false) => false,
+        (false, true) => true,
+        (false, false) => a > b,
+    };
+
+    let result = match result {
+        true => 1.into(),
+        false => 0.into(),
+    };
+
+    push(stack, result, limit)?;
+    Ok(result)
+}

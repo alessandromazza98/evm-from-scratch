@@ -1,7 +1,10 @@
 use crate::{
     errors::ExecutionError,
     opcode::OpCode,
-    utility::{add, addmod, div, mod_fn, mul, mulmod, pop, push, push_data, sub},
+    utility::{
+        add, addmod, div, exp, gt, lt, mod_fn, mul, mulmod, pop, push, push_data, sdiv,
+        sign_extend, smod, sub, slt, sgt,
+    },
 };
 use primitive_types::U256;
 
@@ -86,6 +89,38 @@ impl Evm {
             }
             OpCode::Mulmod => {
                 mulmod(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Exp => {
+                exp(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Signextend => {
+                sign_extend(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Sdiv => {
+                sdiv(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Smod => {
+                smod(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Lt => {
+                lt(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Gt => {
+                gt(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Slt => {
+                slt(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Sgt => {
+                sgt(&mut self.stack, self.limit)?;
                 Ok(())
             }
         }

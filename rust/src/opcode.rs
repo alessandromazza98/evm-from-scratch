@@ -33,9 +33,17 @@ opcodes! {
     Mul(2),
     Sub(3),
     Div(4),
+    Sdiv(5),
     Mod(6),
+    Smod(7),
     Addmod(8),
     Mulmod(9),
+    Exp(10),
+    Signextend(11),
+    Lt(16),
+    Gt(17),
+    Slt(18),
+    Sgt(19),
 }
 
 impl OpCode {

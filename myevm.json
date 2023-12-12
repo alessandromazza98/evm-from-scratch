@@ -1,16 +1,16 @@
 [
     {
-        "name": "MULMOD (wrapped)",
+        "name": "SMOD (negative)",
+        "hint": "Read \"Negative Numbers\" section of the course learning materials. -10 mod -3 = -1",
         "code": {
-            "asm": "PUSH1 12\nPUSH32 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\nPUSH32 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\nMULMOD",
-            "bin": "600c7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff09"
+            "asm": "PUSH32 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd\nPUSH32 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8\nSMOD",
+            "bin": "7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff807"
         },
         "expect": {
             "stack": [
-                "0x9"
+                "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"
             ],
             "success": true
-        },
-        "hint": ""
+        }
     }
 ]
