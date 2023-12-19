@@ -267,3 +267,104 @@ pub fn sgt(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> 
     push(stack, result, limit)?;
     Ok(result)
 }
+
+pub fn eq(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let a = pop(stack)?;
+    let b = pop(stack)?;
+
+    let result = if a == b { 1.into() } else { 0.into() };
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn iszero(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let a = pop(stack)?;
+
+    let result = if a.is_zero() { 1.into() } else { 0.into() };
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn not(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let a = pop(stack)?;
+    let a_negated = !a;
+
+    push(stack, a_negated, limit)?;
+    Ok(a_negated)
+}
+
+pub fn and(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let a = pop(stack)?;
+    let b = pop(stack)?;
+
+    let result = a & b;
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn or(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let a = pop(stack)?;
+    let b = pop(stack)?;
+
+    let result = a | b;
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn xor(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let a = pop(stack)?;
+    let b = pop(stack)?;
+
+    let result = a ^ b;
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn shl(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let shift = pop(stack)?;
+    let value = pop(stack)?;
+
+    let result = value << shift;
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn shr(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let shift = pop(stack)?;
+    let value = pop(stack)?;
+
+    let result = value >> shift;
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn sar(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let shift = pop(stack)?;
+    let value = pop(stack)?;
+
+    let is_value_negative = value.bit(255);
+
+    let mut result: U256;
+
+    if is_value_negative {
+        let (value_negated, _) = value.overflowing_neg();
+        result = value_negated >> shift;
+        if result.is_zero() {
+            result = U256::max_value();
+        } else {
+            result = result.overflowing_neg().0;
+        }
+    } else {
+        result = value >> shift;
+    }
+
+    push(stack, result, limit)?;
+    Ok(result)
+}

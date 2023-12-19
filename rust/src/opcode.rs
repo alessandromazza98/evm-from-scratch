@@ -44,6 +44,15 @@ opcodes! {
     Gt(17),
     Slt(18),
     Sgt(19),
+    Eq(20),
+    Iszero(21),
+    And(22),
+    Or(23),
+    Xor(24),
+    Not(25),
+    Shl(27),
+    Shr(28),
+    Sar(29),
 }
 
 impl OpCode {
