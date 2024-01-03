@@ -21,6 +21,7 @@ struct Evmtest {
     name: String,
     hint: String,
     code: Code,
+    tx: Option<TxDataRaw>,
     expect: Expect,
 }
 
@@ -28,6 +29,11 @@ struct Evmtest {
 struct Code {
     asm: String,
     bin: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct TxDataRaw {
+    to: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -48,8 +54,18 @@ fn main() {
         println!("Test {} of {}: {}", index + 1, total, test.name);
 
         let code: Vec<u8> = hex::decode(&test.code.bin).unwrap();
+        let tx_to = match &test.tx {
+            Some(tx) => {
+                // [2..] is necessary to delete the initial 0x
+                let to = hex::decode(&tx.to.as_ref().unwrap_or(&String::from(""))[2..]).unwrap();
+                to
+            }
+            None => {
+                vec![]
+            }
+        };
 
-        let result = evm(&code);
+        let result = evm(&code, tx_to);
 
         let mut expected_stack: Vec<U256> = Vec::new();
         if let Some(ref stacks) = test.expect.stack {

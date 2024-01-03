@@ -1,5 +1,6 @@
-use crate::errors::ExecutionError;
+use crate::{errors::ExecutionError, jumpdest::valid_jumpdest, memory::Memory};
 use primitive_types::U256;
+use sha3::{Digest, Keccak256};
 
 pub fn push_data(push_data_size: usize, code: &[u8], start: usize) -> Result<U256, ExecutionError> {
     let remaining_code = &code[start..];
@@ -367,4 +368,206 @@ pub fn sar(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> 
 
     push(stack, result, limit)?;
     Ok(result)
+}
+
+pub fn byte(stack: &mut Vec<U256>, limit: usize) -> Result<U256, ExecutionError> {
+    let i = pop(stack)?;
+    let x = pop(stack)?;
+
+    // `i` must be less than 31 to avoid exceeding the max byte width (32).
+    if i > 31.into() {
+        // if the byte offset is out of range, the result is 0.
+        push(stack, 0.into(), limit)?;
+        return Ok(0.into());
+    }
+
+    // `31 - i` is needed because in the `byte` opcode `i` represents the byte offset starting from the most significant byte.
+    let x_byte = x.byte(31 - i.as_usize());
+    let x_byte = x_byte.into();
+
+    push(stack, x_byte, limit)?;
+    Ok(x_byte)
+}
+
+pub fn duplicate_data(
+    duplicated_data_index: usize,
+    stack: &mut Vec<U256>,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let mut ignored_values = vec![];
+    // pop all preceding values from the stack.
+    for _ in 0..duplicated_data_index - 1 {
+        ignored_values.push(pop(stack)?);
+    }
+
+    let duplicated_data = pop(stack)?;
+
+    // re-push original (duplicated) data into the stack
+    push(stack, duplicated_data, limit)?;
+
+    // re-push ignored data into the stack.
+    for ignored_value in ignored_values.into_iter().rev() {
+        push(stack, ignored_value, limit)?;
+    }
+
+    // push the duplicated value into the stack.
+    push(stack, duplicated_data, limit)?;
+
+    Ok(duplicated_data)
+}
+
+pub fn swap_data(
+    swap_data_index: usize,
+    stack: &mut Vec<U256>,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let first_item = pop(stack)?;
+
+    let mut ignored_values = vec![];
+    // pop all preceding values from the stack.
+    for _ in 0..swap_data_index - 1 {
+        ignored_values.push(pop(stack)?);
+    }
+
+    let swap_data = pop(stack)?;
+
+    // push first item into the stack
+    push(stack, first_item, limit)?;
+
+    // re-push ignored data into the stack.
+    for ignored_value in ignored_values.into_iter().rev() {
+        push(stack, ignored_value, limit)?;
+    }
+
+    // push the swap data into the stack.
+    push(stack, swap_data, limit)?;
+
+    Ok(swap_data)
+}
+
+pub fn jump(counter: U256, code: &[u8], pc: &mut usize) -> Result<U256, ExecutionError> {
+    let is_valid = valid_jumpdest(counter, code)?;
+    if is_valid {
+        *pc = counter.as_usize();
+        Ok(counter)
+    } else {
+        Err(ExecutionError::NotValidJumpDestination)
+    }
+}
+
+pub fn mstore(stack: &mut Vec<U256>, memory: &mut Memory) -> Result<U256, ExecutionError> {
+    let offset = pop(stack)?.as_usize();
+    let value = pop(stack)?;
+
+    let mut value_bytes = [0u8; 32];
+    value.to_big_endian(&mut value_bytes);
+
+    // memory must have at least offset + 32 free bytes left.
+    if memory.store.len() < offset + 32 {
+        let resize_value = (offset + 31) / 32 + 1;
+        if let Some(resize_value) = resize_value.checked_mul(32) {
+            memory.store.resize(resize_value, 0);
+        } else {
+            return Err(ExecutionError::IntegerOverflow);
+        }
+    }
+
+    for i in 0..32 {
+        memory.store[offset + i] = value_bytes[i];
+    }
+
+    Ok(value)
+}
+
+pub fn mload(
+    stack: &mut Vec<U256>,
+    memory: &mut Memory,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let offset = pop(stack)?.as_usize();
+
+    let mut value = vec![];
+
+    // memory must have at least offset + 32 free bytes left.
+    if memory.store.len() < offset + 32 {
+        let resize_value = (offset + 31) / 32 + 1;
+        if let Some(resize_value) = resize_value.checked_mul(32) {
+            memory.store.resize(resize_value, 0);
+        } else {
+            return Err(ExecutionError::IntegerOverflow);
+        }
+    }
+
+    for i in 0..32 {
+        value.push(*memory.store.get(offset + i).unwrap_or(&0));
+    }
+    let value = U256::from_big_endian(value.as_slice());
+
+    push(stack, value, limit)?;
+    Ok(value.into())
+}
+
+pub fn mstore8(stack: &mut Vec<U256>, memory: &mut Memory) -> Result<U256, ExecutionError> {
+    let offset = pop(stack)?.as_usize();
+    let value = pop(stack)?;
+
+    let mut value_bytes = [0u8; 32];
+    value.to_big_endian(&mut value_bytes);
+
+    if memory.store.len() < offset {
+        let resize_value = offset / 32 + 1;
+        if let Some(resize_value) = resize_value.checked_mul(32) {
+            memory.store.resize(resize_value, 0);
+        } else {
+            return Err(ExecutionError::IntegerOverflow);
+        }
+    }
+
+    memory.store[offset] = value_bytes[31];
+
+    Ok(value)
+}
+
+pub fn msize(
+    stack: &mut Vec<U256>,
+    memory: &mut Memory,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let size = memory.store.len().into();
+
+    push(stack, size, limit)?;
+    Ok(size)
+}
+
+pub fn sha_3(
+    stack: &mut Vec<U256>,
+    memory: &mut Memory,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let offset = pop(stack)?.as_usize();
+    let size = pop(stack)?.as_usize();
+
+    let value = &memory.store[offset..(offset + size)];
+
+    // create hash
+    let mut hasher = Keccak256::new();
+    hasher.update(value);
+    let result = hasher.finalize();
+
+    // convert into U256
+    let result = U256::from_big_endian(&result);
+    push(stack, result, limit)?;
+
+    Ok(result)
+}
+
+pub fn address(
+    stack: &mut Vec<U256>,
+    to_address: U256,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let address = to_address;
+
+    push(stack, address, limit)?;
+    Ok(address)
 }

@@ -10,4 +10,10 @@ pub enum ExecutionError {
     InsufficientCodeItems,
     #[error("the EVM stack can hold up to 1024 elements")]
     StackOverflow,
+    #[error("not a valid jump destination")]
+    NotValidJumpDestination,
+    #[error("invalid opcode")]
+    InvalidOpcode,
+    #[error("integer overflow")]
+    IntegerOverflow,
 }

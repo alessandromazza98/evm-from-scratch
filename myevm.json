@@ -1,16 +1,19 @@
 [
-    {
-        "name": "SAR (too large)",
-        "hint": "When shift amount is too large and the first bit is 1, fills the whole number with 1s",
-        "code": {
-          "asm": "PUSH32 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00\nPUSH4 0xFFFFFFFF\nSAR",
-          "bin": "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0063ffffffff1d"
-        },
-        "expect": {
-          "stack": [
-            "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-          ],
-          "success": true
-        }
-      }
+  {
+    "name": "ADDRESS",
+    "hint": "Read \"Transaction\" section of the course learning materials. Change your evm function parameters list to include transaction data",
+    "tx": {
+      "to": "0x1000000000000000000000000000000000000aaa"
+    },
+    "code": {
+      "asm": "ADDRESS",
+      "bin": "30"
+    },
+    "expect": {
+      "stack": [
+        "0x1000000000000000000000000000000000000aaa"
+      ],
+      "success": true
+    }
+  }
 ]

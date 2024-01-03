@@ -1,22 +1,39 @@
 use crate::{
     errors::ExecutionError,
+    memory::Memory,
     opcode::OpCode,
+    tx_data::TxData,
     utility::{
-        add, addmod, and, div, eq, exp, gt, iszero, lt, mod_fn, mul, mulmod, not, or, pop, push,
-        push_data, sar, sdiv, sgt, shl, shr, sign_extend, slt, smod, sub, xor,
+        add, addmod, and, byte, div, duplicate_data, eq, exp, gt, iszero, jump, lt, mload, mod_fn,
+        msize, mstore, mstore8, mul, mulmod, not, or, pop, push, push_data, sar, sdiv, sgt, sha_3,
+        shl, shr, sign_extend, slt, smod, sub, swap_data, xor, address,
     },
 };
 use primitive_types::U256;
 
 pub struct Evm {
     code: Box<[u8]>,
+    tx_data: TxData,
     stack: Vec<U256>,
+    memory: Memory,
     limit: usize,
 }
 
 impl Evm {
-    pub fn new(code: Box<[u8]>, stack: Vec<U256>, limit: usize) -> Self {
-        Self { code, stack, limit }
+    pub fn new(
+        code: Box<[u8]>,
+        tx_data: TxData,
+        stack: Vec<U256>,
+        memory: Memory,
+        limit: usize,
+    ) -> Self {
+        Self {
+            code,
+            tx_data,
+            stack,
+            memory,
+            limit,
+        }
     }
 
     pub fn execute(&mut self) -> ExecutionResult {
@@ -47,6 +64,7 @@ impl Evm {
             }
             OpCode::Push1
             | OpCode::Push2
+            | OpCode::Push3
             | OpCode::Push4
             | OpCode::Push6
             | OpCode::Push10
@@ -157,6 +175,102 @@ impl Evm {
             }
             OpCode::Sar => {
                 sar(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Byte => {
+                byte(&mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Dup1
+            | OpCode::Dup2
+            | OpCode::Dup3
+            | OpCode::Dup4
+            | OpCode::Dup5
+            | OpCode::Dup6
+            | OpCode::Dup7
+            | OpCode::Dup8
+            | OpCode::Dup9
+            | OpCode::Dup10
+            | OpCode::Dup11
+            | OpCode::Dup12
+            | OpCode::Dup13
+            | OpCode::Dup14
+            | OpCode::Dup15
+            | OpCode::Dup16 => {
+                let duplicated_data_index = opcode.data_index();
+                duplicate_data(duplicated_data_index, &mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Swap1
+            | OpCode::Swap2
+            | OpCode::Swap3
+            | OpCode::Swap4
+            | OpCode::Swap5
+            | OpCode::Swap6
+            | OpCode::Swap7
+            | OpCode::Swap8
+            | OpCode::Swap9
+            | OpCode::Swap10
+            | OpCode::Swap11
+            | OpCode::Swap12
+            | OpCode::Swap13
+            | OpCode::Swap14
+            | OpCode::Swap15
+            | OpCode::Swap16 => {
+                let swap_data_index = opcode.data_index();
+                swap_data(swap_data_index, &mut self.stack, self.limit)?;
+                Ok(())
+            }
+            OpCode::Pc => {
+                push(&mut self.stack, (*pc).into(), self.limit)?;
+                Ok(())
+            }
+            OpCode::Gas => {
+                // it's not supported on this EVM. Always returns U256::MAX.
+                push(&mut self.stack, U256::max_value(), self.limit)?;
+                Ok(())
+            }
+            OpCode::Jump => {
+                let counter = pop(&mut self.stack)?;
+                jump(counter, &self.code, pc)?;
+                Ok(())
+            }
+            OpCode::Jumpi => {
+                let counter = pop(&mut self.stack)?;
+                let b = pop(&mut self.stack)?;
+                if b != 0.into() {
+                    jump(counter, &self.code, pc)?;
+                    Ok(())
+                } else {
+                    Ok(())
+                }
+            }
+            OpCode::Jumpdest => {
+                // do nothing.
+                Ok(())
+            }
+            OpCode::Mstore => {
+                mstore(&mut self.stack, &mut self.memory)?;
+                Ok(())
+            }
+            OpCode::Mload => {
+                mload(&mut self.stack, &mut self.memory, self.limit)?;
+                Ok(())
+            }
+            OpCode::Mstore8 => {
+                mstore8(&mut self.stack, &mut self.memory)?;
+                Ok(())
+            }
+            OpCode::Msize => {
+                msize(&mut self.stack, &mut self.memory, self.limit)?;
+                Ok(())
+            }
+            OpCode::Sha3 => {
+                sha_3(&mut self.stack, &mut self.memory, self.limit)?;
+                Ok(())
+            }
+            OpCode::Address => {
+                address(&mut self.stack, self.tx_data.to, self.limit)?;
                 Ok(())
             }
         }
