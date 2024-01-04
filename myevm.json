@@ -1,19 +1,19 @@
 [
   {
-    "name": "ADDRESS",
-    "hint": "Read \"Transaction\" section of the course learning materials. Change your evm function parameters list to include transaction data",
+    "name": "GASPRICE",
     "tx": {
-      "to": "0x1000000000000000000000000000000000000aaa"
+      "gasprice": "0x99"
     },
     "code": {
-      "asm": "ADDRESS",
-      "bin": "30"
+      "asm": "GASPRICE",
+      "bin": "3a"
     },
     "expect": {
       "stack": [
-        "0x1000000000000000000000000000000000000aaa"
+        "0x99"
       ],
       "success": true
-    }
+    },
+    "hint": ""
   }
 ]

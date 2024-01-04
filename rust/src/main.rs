@@ -22,6 +22,7 @@ struct Evmtest {
     hint: String,
     code: Code,
     tx: Option<TxDataRaw>,
+    block: Option<BlockDataRaw>,
     expect: Expect,
 }
 
@@ -34,6 +35,18 @@ struct Code {
 #[derive(Debug, Deserialize)]
 struct TxDataRaw {
     to: Option<String>,
+    from: Option<String>,
+    origin: Option<String>,
+    gasprice: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BlockDataRaw {
+    basefee: Option<String>,
+    coinbase: Option<String>,
+    timestamp: Option<String>,
+    number: Option<String>,
+    difficulty: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,18 +67,70 @@ fn main() {
         println!("Test {} of {}: {}", index + 1, total, test.name);
 
         let code: Vec<u8> = hex::decode(&test.code.bin).unwrap();
-        let tx_to = match &test.tx {
+        let tx = match &test.tx {
             Some(tx) => {
                 // [2..] is necessary to delete the initial 0x
-                let to = hex::decode(&tx.to.as_ref().unwrap_or(&String::from(""))[2..]).unwrap();
-                to
+                let to = hex::decode(format!(
+                    "{:0>64}",
+                    &tx.to.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
+                let from = hex::decode(format!(
+                    "{:0>64}",
+                    &tx.from.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
+                let origin = hex::decode(format!(
+                    "{:0>64}",
+                    &tx.origin.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
+                let gasprice = hex::decode(format!(
+                    "{:0>64}",
+                    &tx.gasprice.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
+
+                vec![to, from, origin, gasprice]
             }
-            None => {
-                vec![]
-            }
+            None => vec![],
         };
 
-        let result = evm(&code, tx_to);
+        let block = match &test.block {
+            Some(block) => {
+                // [2..] is necessary to delete the initial 0x
+                let basefee = hex::decode(format!(
+                    "{:0>64}",
+                    &block.basefee.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
+                let coinbase = hex::decode(format!(
+                    "{:0>64}",
+                    &block.coinbase.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
+                let timestamp = hex::decode(format!(
+                    "{:0>64}",
+                    &block.timestamp.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
+                let number = hex::decode(format!(
+                    "{:0>64}",
+                    &block.number.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
+                let difficulty = hex::decode(format!(
+                    "{:0>64}",
+                    &block.difficulty.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
+
+                vec![basefee, coinbase, timestamp, number, difficulty]
+            }
+            None => vec![],
+        };
+
+        let result = evm(&code, tx, block);
 
         let mut expected_stack: Vec<U256> = Vec::new();
         if let Some(ref stacks) = test.expect.stack {

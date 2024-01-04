@@ -571,3 +571,83 @@ pub fn address(
     push(stack, address, limit)?;
     Ok(address)
 }
+
+pub fn caller(
+    stack: &mut Vec<U256>,
+    from_address: U256,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let value = from_address;
+
+    push(stack, value, limit)?;
+    Ok(value)
+}
+
+pub fn origin(
+    stack: &mut Vec<U256>,
+    origin_address: U256,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let value = origin_address;
+
+    push(stack, value, limit)?;
+    Ok(value)
+}
+
+pub fn gasprice(
+    stack: &mut Vec<U256>,
+    gasprice: U256,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let value = gasprice;
+
+    push(stack, value, limit)?;
+    Ok(value)
+}
+
+pub fn basefee(stack: &mut Vec<U256>, basefee: U256, limit: usize) -> Result<U256, ExecutionError> {
+    let value = basefee;
+
+    push(stack, value, limit)?;
+    Ok(value)
+}
+
+pub fn coinbase(
+    stack: &mut Vec<U256>,
+    coinbase: U256,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let value = coinbase;
+
+    push(stack, value, limit)?;
+    Ok(value)
+}
+
+pub fn timestamp(
+    stack: &mut Vec<U256>,
+    timestamp: U256,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let value = timestamp;
+
+    push(stack, value, limit)?;
+    Ok(value)
+}
+
+pub fn number(stack: &mut Vec<U256>, number: U256, limit: usize) -> Result<U256, ExecutionError> {
+    let value = number;
+
+    push(stack, value, limit)?;
+    Ok(value)
+}
+
+pub fn difficulty(
+    stack: &mut Vec<U256>,
+    difficulty: U256,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let value = difficulty;
+
+    push(stack, value, limit)?;
+    Ok(value)
+}

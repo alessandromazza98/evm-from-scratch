@@ -1,12 +1,14 @@
 use crate::{
+    block_data::BlockData,
     errors::ExecutionError,
     memory::Memory,
     opcode::OpCode,
     tx_data::TxData,
     utility::{
-        add, addmod, and, byte, div, duplicate_data, eq, exp, gt, iszero, jump, lt, mload, mod_fn,
-        msize, mstore, mstore8, mul, mulmod, not, or, pop, push, push_data, sar, sdiv, sgt, sha_3,
-        shl, shr, sign_extend, slt, smod, sub, swap_data, xor, address,
+        add, addmod, address, and, basefee, byte, caller, coinbase, div, duplicate_data, eq, exp,
+        gasprice, gt, iszero, jump, lt, mload, mod_fn, msize, mstore, mstore8, mul, mulmod, not,
+        number, or, origin, pop, push, push_data, sar, sdiv, sgt, sha_3, shl, shr, sign_extend,
+        slt, smod, sub, swap_data, timestamp, xor, difficulty,
     },
 };
 use primitive_types::U256;
@@ -14,6 +16,7 @@ use primitive_types::U256;
 pub struct Evm {
     code: Box<[u8]>,
     tx_data: TxData,
+    block_data: BlockData,
     stack: Vec<U256>,
     memory: Memory,
     limit: usize,
@@ -23,6 +26,7 @@ impl Evm {
     pub fn new(
         code: Box<[u8]>,
         tx_data: TxData,
+        block_data: BlockData,
         stack: Vec<U256>,
         memory: Memory,
         limit: usize,
@@ -30,6 +34,7 @@ impl Evm {
         Self {
             code,
             tx_data,
+            block_data,
             stack,
             memory,
             limit,
@@ -271,6 +276,38 @@ impl Evm {
             }
             OpCode::Address => {
                 address(&mut self.stack, self.tx_data.to, self.limit)?;
+                Ok(())
+            }
+            OpCode::Caller => {
+                caller(&mut self.stack, self.tx_data.from, self.limit)?;
+                Ok(())
+            }
+            OpCode::Origin => {
+                origin(&mut self.stack, self.tx_data.origin, self.limit)?;
+                Ok(())
+            }
+            OpCode::Gasprice => {
+                gasprice(&mut self.stack, self.tx_data.gasprice, self.limit)?;
+                Ok(())
+            }
+            OpCode::Basfee => {
+                basefee(&mut self.stack, self.block_data.basefee, self.limit)?;
+                Ok(())
+            }
+            OpCode::Coinbase => {
+                coinbase(&mut self.stack, self.block_data.coinbase, self.limit)?;
+                Ok(())
+            }
+            OpCode::Timestamp => {
+                timestamp(&mut self.stack, self.block_data.timestamp, self.limit)?;
+                Ok(())
+            }
+            OpCode::Number => {
+                number(&mut self.stack, self.block_data.number, self.limit)?;
+                Ok(())
+            }
+            OpCode::Difficulty => {
+                difficulty(&mut self.stack, self.block_data.difficulty, self.limit)?;
                 Ok(())
             }
         }
