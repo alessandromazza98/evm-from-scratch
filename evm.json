@@ -1846,7 +1846,7 @@
     "state": {
       "0x1000000000000000000000000000000000000aaa": {
         "code": {
-          "asm": null,
+          "asm": "PUSH1 1",
           "bin": "6001"
         }
       }
@@ -1869,7 +1869,7 @@
     "state": {
       "0x1000000000000000000000000000000000000aaa": {
         "code": {
-          "asm": null,
+          "asm": "SELFDESTRUCT SELFDESTRUCT SELFDESTRUCT SELFDESTRUCT",
           "bin": "FFFFFFFF"
         }
       }

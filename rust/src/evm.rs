@@ -3,12 +3,13 @@ use crate::{
     errors::ExecutionError,
     memory::Memory,
     opcode::OpCode,
+    state_data::State,
     tx_data::TxData,
     utility::{
-        add, addmod, address, and, basefee, byte, caller, coinbase, div, duplicate_data, eq, exp,
-        gasprice, gt, iszero, jump, lt, mload, mod_fn, msize, mstore, mstore8, mul, mulmod, not,
-        number, or, origin, pop, push, push_data, sar, sdiv, sgt, sha_3, shl, shr, sign_extend,
-        slt, smod, sub, swap_data, timestamp, xor, difficulty,
+        add, addmod, and, balance, byte, calldatacopy, calldataload, calldatasize, div,
+        duplicate_data, eq, exp, gt, iszero, jump, lt, mload, mod_fn, msize, mstore, mstore8, mul,
+        mulmod, not, or, pop, push, push_data, push_from_big_endian, sar, sdiv, sgt, sha_3, shl,
+        shr, sign_extend, slt, smod, sub, swap_data, xor,
     },
 };
 use primitive_types::U256;
@@ -17,6 +18,7 @@ pub struct Evm {
     code: Box<[u8]>,
     tx_data: TxData,
     block_data: BlockData,
+    state: State,
     stack: Vec<U256>,
     memory: Memory,
     limit: usize,
@@ -27,6 +29,7 @@ impl Evm {
         code: Box<[u8]>,
         tx_data: TxData,
         block_data: BlockData,
+        state: State,
         stack: Vec<U256>,
         memory: Memory,
         limit: usize,
@@ -35,6 +38,7 @@ impl Evm {
             code,
             tx_data,
             block_data,
+            state,
             stack,
             memory,
             limit,
@@ -71,9 +75,33 @@ impl Evm {
             | OpCode::Push2
             | OpCode::Push3
             | OpCode::Push4
+            | OpCode::Push5
             | OpCode::Push6
+            | OpCode::Push7
+            | OpCode::Push8
+            | OpCode::Push9
             | OpCode::Push10
             | OpCode::Push11
+            | OpCode::Push12
+            | OpCode::Push13
+            | OpCode::Push14
+            | OpCode::Push15
+            | OpCode::Push16
+            | OpCode::Push17
+            | OpCode::Push18
+            | OpCode::Push19
+            | OpCode::Push20
+            | OpCode::Push21
+            | OpCode::Push22
+            | OpCode::Push23
+            | OpCode::Push24
+            | OpCode::Push25
+            | OpCode::Push26
+            | OpCode::Push27
+            | OpCode::Push28
+            | OpCode::Push29
+            | OpCode::Push30
+            | OpCode::Push31
             | OpCode::Push32 => {
                 let start = *pc + 1;
                 let push_data_size = opcode.push_data_size();
@@ -275,39 +303,71 @@ impl Evm {
                 Ok(())
             }
             OpCode::Address => {
-                address(&mut self.stack, self.tx_data.to, self.limit)?;
+                push_from_big_endian(&mut self.stack, &self.tx_data.to, self.limit)?;
                 Ok(())
             }
             OpCode::Caller => {
-                caller(&mut self.stack, self.tx_data.from, self.limit)?;
+                push_from_big_endian(&mut self.stack, &self.tx_data.from, self.limit)?;
                 Ok(())
             }
             OpCode::Origin => {
-                origin(&mut self.stack, self.tx_data.origin, self.limit)?;
+                push_from_big_endian(&mut self.stack, &self.tx_data.origin, self.limit)?;
                 Ok(())
             }
             OpCode::Gasprice => {
-                gasprice(&mut self.stack, self.tx_data.gasprice, self.limit)?;
+                push_from_big_endian(&mut self.stack, &self.tx_data.gasprice, self.limit)?;
                 Ok(())
             }
             OpCode::Basfee => {
-                basefee(&mut self.stack, self.block_data.basefee, self.limit)?;
+                push_from_big_endian(&mut self.stack, &self.block_data.basefee, self.limit)?;
                 Ok(())
             }
             OpCode::Coinbase => {
-                coinbase(&mut self.stack, self.block_data.coinbase, self.limit)?;
+                push_from_big_endian(&mut self.stack, &self.block_data.coinbase, self.limit)?;
                 Ok(())
             }
             OpCode::Timestamp => {
-                timestamp(&mut self.stack, self.block_data.timestamp, self.limit)?;
+                push_from_big_endian(&mut self.stack, &self.block_data.timestamp, self.limit)?;
                 Ok(())
             }
             OpCode::Number => {
-                number(&mut self.stack, self.block_data.number, self.limit)?;
+                push_from_big_endian(&mut self.stack, &self.block_data.number, self.limit)?;
                 Ok(())
             }
             OpCode::Difficulty => {
-                difficulty(&mut self.stack, self.block_data.difficulty, self.limit)?;
+                push_from_big_endian(&mut self.stack, &self.block_data.difficulty, self.limit)?;
+                Ok(())
+            }
+            OpCode::Gaslimit => {
+                push_from_big_endian(&mut self.stack, &self.block_data.gaslimit, self.limit)?;
+                Ok(())
+            }
+            OpCode::Chainid => {
+                push_from_big_endian(&mut self.stack, &self.block_data.chainid, self.limit)?;
+                Ok(())
+            }
+            OpCode::Blockhash => {
+                // not used in this test suite, can return 0.
+                Ok(())
+            }
+            OpCode::Balance => {
+                balance(&mut self.stack, &self.state, self.limit)?;
+                Ok(())
+            }
+            OpCode::Callvalue => {
+                push_from_big_endian(&mut self.stack, &self.tx_data.value, self.limit)?;
+                Ok(())
+            }
+            OpCode::Calldataload => {
+                calldataload(&mut self.stack, &self.tx_data.data, self.limit)?;
+                Ok(())
+            }
+            OpCode::Calldatasize => {
+                calldatasize(&mut self.stack, &self.tx_data.data, self.limit)?;
+                Ok(())
+            }
+            OpCode::Calldatacopy => {
+                calldatacopy(&mut self.stack, &mut self.memory, &self.tx_data.data)?;
                 Ok(())
             }
         }

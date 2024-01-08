@@ -1,28 +1,32 @@
-use primitive_types::U256;
-
 /// Tx data.
 pub struct TxData {
-    pub to: U256,
-    pub from: U256,
-    pub origin: U256,
-    pub gasprice: U256,
+    pub to: Vec<u8>,
+    pub from: Vec<u8>,
+    pub origin: Vec<u8>,
+    pub gasprice: Vec<u8>,
+    pub value: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 impl TxData {
     pub fn new(tx_data: Vec<Vec<u8>>) -> TxData {
         if !tx_data.is_empty() {
             Self {
-                to: U256::from_big_endian(tx_data[0].as_slice()),
-                from: U256::from_big_endian(tx_data[1].as_slice()),
-                origin: U256::from_big_endian(tx_data[2].as_slice()),
-                gasprice: U256::from_big_endian(tx_data[3].as_slice()),
+                to: tx_data[0].clone(),
+                from: tx_data[1].clone(),
+                origin: tx_data[2].clone(),
+                gasprice: tx_data[3].clone(),
+                value: tx_data[4].clone(),
+                data: tx_data[5].clone(),
             }
         } else {
             Self {
-                to: 0.into(),
-                from: 0.into(),
-                origin: 0.into(),
-                gasprice: 0.into(),
+                to: vec![],
+                from: vec![],
+                origin: vec![],
+                gasprice: vec![],
+                value: vec![],
+                data: vec![],
             }
         }
     }

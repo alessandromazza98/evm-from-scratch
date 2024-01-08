@@ -1,4 +1,4 @@
-use crate::{errors::ExecutionError, jumpdest::valid_jumpdest, memory::Memory};
+use crate::{errors::ExecutionError, jumpdest::valid_jumpdest, memory::Memory, state_data::State};
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
 
@@ -459,24 +459,7 @@ pub fn mstore(stack: &mut Vec<U256>, memory: &mut Memory) -> Result<U256, Execut
     let offset = pop(stack)?.as_usize();
     let value = pop(stack)?;
 
-    let mut value_bytes = [0u8; 32];
-    value.to_big_endian(&mut value_bytes);
-
-    // memory must have at least offset + 32 free bytes left.
-    if memory.store.len() < offset + 32 {
-        let resize_value = (offset + 31) / 32 + 1;
-        if let Some(resize_value) = resize_value.checked_mul(32) {
-            memory.store.resize(resize_value, 0);
-        } else {
-            return Err(ExecutionError::IntegerOverflow);
-        }
-    }
-
-    for i in 0..32 {
-        memory.store[offset + i] = value_bytes[i];
-    }
-
-    Ok(value)
+    memory.save_word(offset, value)
 }
 
 pub fn mload(
@@ -485,23 +468,7 @@ pub fn mload(
     limit: usize,
 ) -> Result<U256, ExecutionError> {
     let offset = pop(stack)?.as_usize();
-
-    let mut value = vec![];
-
-    // memory must have at least offset + 32 free bytes left.
-    if memory.store.len() < offset + 32 {
-        let resize_value = (offset + 31) / 32 + 1;
-        if let Some(resize_value) = resize_value.checked_mul(32) {
-            memory.store.resize(resize_value, 0);
-        } else {
-            return Err(ExecutionError::IntegerOverflow);
-        }
-    }
-
-    for i in 0..32 {
-        value.push(*memory.store.get(offset + i).unwrap_or(&0));
-    }
-    let value = U256::from_big_endian(value.as_slice());
+    let value = memory.get_word(offset)?;
 
     push(stack, value, limit)?;
     Ok(value.into())
@@ -514,17 +481,7 @@ pub fn mstore8(stack: &mut Vec<U256>, memory: &mut Memory) -> Result<U256, Execu
     let mut value_bytes = [0u8; 32];
     value.to_big_endian(&mut value_bytes);
 
-    if memory.store.len() < offset {
-        let resize_value = offset / 32 + 1;
-        if let Some(resize_value) = resize_value.checked_mul(32) {
-            memory.store.resize(resize_value, 0);
-        } else {
-            return Err(ExecutionError::IntegerOverflow);
-        }
-    }
-
-    memory.store[offset] = value_bytes[31];
-
+    memory.save_byte(offset, value_bytes[31])?;
     Ok(value)
 }
 
@@ -561,93 +518,67 @@ pub fn sha_3(
     Ok(result)
 }
 
-pub fn address(
+pub fn push_from_big_endian(
     stack: &mut Vec<U256>,
-    to_address: U256,
+    slice: &[u8],
     limit: usize,
 ) -> Result<U256, ExecutionError> {
-    let address = to_address;
+    let value = U256::from_big_endian(slice);
 
-    push(stack, address, limit)?;
-    Ok(address)
+    push(stack, value, limit)?;
+    Ok(value)
 }
 
-pub fn caller(
+pub fn balance(stack: &mut Vec<U256>, state: &State, limit: usize) -> Result<U256, ExecutionError> {
+    let address = pop(stack)?;
+    let balance = state.get_balance(address);
+
+    push_from_big_endian(stack, &balance, limit)
+}
+
+pub fn calldataload(
     stack: &mut Vec<U256>,
-    from_address: U256,
+    data: &Vec<u8>,
     limit: usize,
 ) -> Result<U256, ExecutionError> {
-    let value = from_address;
+    let index = pop(stack)?;
 
-    push(stack, value, limit)?;
-    Ok(value)
+    let size = data.len() as isize - index.as_usize() as isize - 32;
+    let mut data_clone = data.clone();
+
+    if size < 0 {
+        data_clone.append(&mut vec![0; size.abs() as usize]);
+    }
+
+    let value = &data_clone[index.as_usize()..index.as_usize() + 32];
+
+    push_from_big_endian(stack, value, limit)
 }
 
-pub fn origin(
+pub fn calldatasize(
     stack: &mut Vec<U256>,
-    origin_address: U256,
+    data: &Vec<u8>,
     limit: usize,
 ) -> Result<U256, ExecutionError> {
-    let value = origin_address;
+    let size = data.len().into();
 
-    push(stack, value, limit)?;
-    Ok(value)
+    push(stack, size, limit)?;
+    Ok(size)
 }
 
-pub fn gasprice(
+pub fn calldatacopy(
     stack: &mut Vec<U256>,
-    gasprice: U256,
-    limit: usize,
-) -> Result<U256, ExecutionError> {
-    let value = gasprice;
+    memory: &mut Memory,
+    data: &Vec<u8>,
+) -> Result<(), ExecutionError> {
+    let dest_offset = pop(stack)?.as_usize();
+    let offset = pop(stack)?.as_usize();
+    let size = pop(stack)?.as_usize();
 
-    push(stack, value, limit)?;
-    Ok(value)
-}
+    let data = &data[offset..offset + size];
 
-pub fn basefee(stack: &mut Vec<U256>, basefee: U256, limit: usize) -> Result<U256, ExecutionError> {
-    let value = basefee;
-
-    push(stack, value, limit)?;
-    Ok(value)
-}
-
-pub fn coinbase(
-    stack: &mut Vec<U256>,
-    coinbase: U256,
-    limit: usize,
-) -> Result<U256, ExecutionError> {
-    let value = coinbase;
-
-    push(stack, value, limit)?;
-    Ok(value)
-}
-
-pub fn timestamp(
-    stack: &mut Vec<U256>,
-    timestamp: U256,
-    limit: usize,
-) -> Result<U256, ExecutionError> {
-    let value = timestamp;
-
-    push(stack, value, limit)?;
-    Ok(value)
-}
-
-pub fn number(stack: &mut Vec<U256>, number: U256, limit: usize) -> Result<U256, ExecutionError> {
-    let value = number;
-
-    push(stack, value, limit)?;
-    Ok(value)
-}
-
-pub fn difficulty(
-    stack: &mut Vec<U256>,
-    difficulty: U256,
-    limit: usize,
-) -> Result<U256, ExecutionError> {
-    let value = difficulty;
-
-    push(stack, value, limit)?;
-    Ok(value)
+    for (i, byte) in data.iter().enumerate() {
+        memory.save_byte(dest_offset + i, *byte)?;
+    }
+    Ok(())
 }

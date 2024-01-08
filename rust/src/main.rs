@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 /**
  * EVM From Scratch
  * Rust template
@@ -23,6 +25,8 @@ struct Evmtest {
     code: Code,
     tx: Option<TxDataRaw>,
     block: Option<BlockDataRaw>,
+    #[serde(default)]
+    state: StateRaw,
     expect: Expect,
 }
 
@@ -38,6 +42,8 @@ struct TxDataRaw {
     from: Option<String>,
     origin: Option<String>,
     gasprice: Option<String>,
+    value: Option<String>,
+    data: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -47,6 +53,20 @@ struct BlockDataRaw {
     timestamp: Option<String>,
     number: Option<String>,
     difficulty: Option<String>,
+    gaslimit: Option<String>,
+    chainid: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct StateRaw {
+    #[serde(flatten)]
+    state: HashMap<String, AddressData>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AddressData {
+    balance: Option<String>,
+    code: Option<Code>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -90,8 +110,18 @@ fn main() {
                     &tx.gasprice.as_ref().unwrap_or(&String::from("aa"))[2..]
                 ))
                 .unwrap();
+                let value = hex::decode(format!(
+                    "{:0>64}",
+                    &tx.value.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
+                let data = hex::decode(format!(
+                    "{:0>64}",
+                    &tx.data.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
 
-                vec![to, from, origin, gasprice]
+                vec![to, from, origin, gasprice, value, data]
             }
             None => vec![],
         };
@@ -124,13 +154,53 @@ fn main() {
                     &block.difficulty.as_ref().unwrap_or(&String::from("aa"))[2..]
                 ))
                 .unwrap();
+                let gaslimit = hex::decode(format!(
+                    "{:0>64}",
+                    &block.gaslimit.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
+                let chainid = hex::decode(format!(
+                    "{:0>64}",
+                    &block.chainid.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
 
-                vec![basefee, coinbase, timestamp, number, difficulty]
+                vec![
+                    basefee, coinbase, timestamp, number, difficulty, gaslimit, chainid,
+                ]
             }
             None => vec![],
         };
 
-        let result = evm(&code, tx, block);
+        let state = if !&test.state.state.is_empty() {
+            let state = &test.state;
+            let mut state_map = HashMap::new();
+            for (address, data) in &state.state {
+                let address = hex::decode(format!("{:0>64}", &address[2..])).unwrap();
+                let balance = hex::decode(format!(
+                    "{:0>64}",
+                    &data.balance.as_ref().unwrap_or(&String::from("aa"))[2..]
+                ))
+                .unwrap();
+                let code = hex::decode(
+                    &data
+                        .code
+                        .as_ref()
+                        .unwrap_or(&Code {
+                            asm: "".to_string(),
+                            bin: "".to_string(),
+                        })
+                        .bin,
+                )
+                .unwrap();
+                state_map.insert(address, (balance, code));
+            }
+            state_map
+        } else {
+            HashMap::default()
+        };
+
+        let result = evm(&code, tx, block, state);
 
         let mut expected_stack: Vec<U256> = Vec::new();
         if let Some(ref stacks) = test.expect.stack {

@@ -1,19 +1,19 @@
 [
   {
-    "name": "GASPRICE",
+    "name": "CALLDATACOPY",
+    "hint": "Copy 32-byte chunk of calldata into memory. Do not forget to update MSIZE after CALLDATACOPY",
     "tx": {
-      "gasprice": "0x99"
+      "data": "000102030405060708090a0b0c0d0e0f00112233445566778899aabbccddeeff"
     },
     "code": {
-      "asm": "GASPRICE",
-      "bin": "3a"
+      "asm": "PUSH1 32\nPUSH1 0\nPUSH1 0\nCALLDATACOPY\nPUSH1 0\nMLOAD",
+      "bin": "60206000600037600051"
     },
     "expect": {
       "stack": [
-        "0x99"
+        "0x102030405060708090a0b0c0d0e0f00112233445566778899aabbccddeeff"
       ],
       "success": true
-    },
-    "hint": ""
+    }
   }
 ]
