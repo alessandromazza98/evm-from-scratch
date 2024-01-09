@@ -45,6 +45,24 @@ impl Memory {
         Ok(byte)
     }
 
+    pub fn get_byte(&mut self, offset: usize) -> Result<u8, ExecutionError> {
+        // memory must have at least offset free bytes left.
+        self.resize(offset, 1)?;
+
+        let byte = *self.store.get(offset).unwrap_or(&0);
+
+        Ok(byte)
+    }
+
+    pub fn get_bytes(&mut self, offset: usize, n_bytes: usize) -> Result<Vec<u8>, ExecutionError> {
+        let mut bytes = vec![];
+        for i in 0..n_bytes {
+            bytes.push(self.get_byte(offset + i)?);
+        }
+
+        Ok(bytes)
+    }
+
     pub fn get_word(&mut self, offset: usize) -> Result<U256, ExecutionError> {
         let mut value = vec![];
 

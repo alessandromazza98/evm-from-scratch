@@ -14,7 +14,7 @@ use std::collections::HashMap;
  * gave up and switched to JavaScript, Python, or Go. If you are new
  * to Rust, implement EVM in another programming language first.
  */
-use evm::evm;
+use evm::{evm, Log};
 use primitive_types::U256;
 use serde::Deserialize;
 
@@ -73,8 +73,16 @@ struct AddressData {
 struct Expect {
     stack: Option<Vec<String>>,
     success: bool,
+    logs: Option<Vec<LogRaw>>,
     // #[serde(rename = "return")]
     // ret: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LogRaw {
+    address: String,
+    data: String,
+    topics: Vec<String>,
 }
 
 fn main() {
@@ -209,10 +217,39 @@ fn main() {
             }
         }
 
+        let mut expected_logs: Vec<Log> = Vec::new();
+        if let Some(ref logs) = test.expect.logs {
+            for log in logs {
+                let LogRaw {
+                    address,
+                    data,
+                    topics,
+                } = log;
+                let address = U256::from_str_radix(address, 16).unwrap();
+                let data = hex::decode(format!("{}", &data)).unwrap();
+                let topics = topics
+                    .iter()
+                    .map(|topic| U256::from_str_radix(topic, 16).unwrap())
+                    .collect();
+                let log = Log {
+                    address,
+                    data,
+                    topics,
+                };
+                expected_logs.push(log);
+            }
+        }
+
         let mut matching = result.stack.len() == expected_stack.len();
         if matching {
             for i in 0..result.stack.len() {
                 if result.stack[i] != expected_stack[i] {
+                    matching = false;
+                    break;
+                }
+            }
+            for i in 0..result.logs.len() {
+                if result.logs[i] != expected_logs[i] {
                     matching = false;
                     break;
                 }
@@ -230,11 +267,21 @@ fn main() {
                 println!("  {:#X},", v);
             }
             println!("]\n");
+            println!("Expected logs: [");
+            for l in expected_logs {
+                println!("  {:#?},", l);
+            }
+            println!("]\n");
 
             println!("Actual success: {:?}", result.success);
             println!("Actual stack: [");
             for v in result.stack {
                 println!("  {:#X},", v);
+            }
+            println!("]\n");
+            println!("Actual logs: [");
+            for l in result.logs {
+                println!("  {:#?},", l);
             }
             println!("]\n");
 

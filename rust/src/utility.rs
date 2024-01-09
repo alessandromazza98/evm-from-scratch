@@ -1,4 +1,7 @@
-use crate::{errors::ExecutionError, jumpdest::valid_jumpdest, memory::Memory, state_data::State};
+use crate::{
+    errors::ExecutionError, jumpdest::valid_jumpdest, memory::Memory, state_data::State,
+    storage::Storage, Log,
+};
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
 
@@ -506,16 +509,27 @@ pub fn sha_3(
 
     let value = &memory.store[offset..(offset + size)];
 
-    // create hash
-    let mut hasher = Keccak256::new();
-    hasher.update(value);
-    let result = hasher.finalize();
+    let result = sha3_hash(&value);
 
-    // convert into U256
-    let result = U256::from_big_endian(&result);
     push(stack, result, limit)?;
 
     Ok(result)
+}
+
+pub fn sha3_hash(data: &[u8]) -> U256 {
+    if data.is_empty() {
+        let result = 0.into();
+        result
+    } else {
+        // create hash
+        let mut hasher = Keccak256::new();
+        hasher.update(data);
+        let result = hasher.finalize();
+
+        // convert into U256
+        let result = U256::from_big_endian(&result);
+        result
+    }
 }
 
 pub fn push_from_big_endian(
@@ -541,23 +555,61 @@ pub fn calldataload(
     data: &Vec<u8>,
     limit: usize,
 ) -> Result<U256, ExecutionError> {
-    let index = pop(stack)?;
+    let index = pop(stack)?.as_usize();
 
-    let size = data.len() as isize - index.as_usize() as isize - 32;
-    let mut data_clone = data.clone();
+    const VALUE_NUM_BYTES: usize = 32;
+    let mut copied_data = [0u8; VALUE_NUM_BYTES];
 
-    if size < 0 {
-        data_clone.append(&mut vec![0; size.abs() as usize]);
+    // check if offset is within bounds of data
+    if index < data.len() {
+        // calculate the amount of data available to copy
+        let available_data = &data[index..];
+
+        // calculate the actual copy size based on available data
+        let copy_size = std::cmp::min(VALUE_NUM_BYTES, available_data.len());
+
+        // copy available data to the destination
+        copied_data[..copy_size].copy_from_slice(&available_data[..copy_size]);
     }
 
-    let value = &data_clone[index.as_usize()..index.as_usize() + 32];
+    let value = &copied_data;
 
     push_from_big_endian(stack, value, limit)
 }
 
-pub fn calldatasize(
+pub fn copy_data_to_memory(
     stack: &mut Vec<U256>,
-    data: &Vec<u8>,
+    memory: &mut Memory,
+    data: &[u8],
+) -> Result<(), ExecutionError> {
+    let dest_offset = pop(stack)?.as_usize();
+    let offset = pop(stack)?.as_usize();
+    let size = pop(stack)?.as_usize();
+
+    let mut copied_data = vec![0; size];
+
+    // check if offset is within bounds of data
+    if offset < data.len() {
+        // calculate the amount of data available to copy
+        let available_data = &data[offset..];
+
+        // calculate the actual copy size based on available data
+        let copy_size = std::cmp::min(size, available_data.len());
+
+        // copy available data to the destination
+        copied_data[..copy_size].copy_from_slice(&available_data[..copy_size]);
+    }
+
+    for (i, byte) in copied_data.iter().enumerate() {
+        memory.save_byte(dest_offset + i, *byte)?;
+    }
+
+    Ok(())
+}
+
+pub fn push_data_size(
+    stack: &mut Vec<U256>,
+    data: &[u8],
     limit: usize,
 ) -> Result<U256, ExecutionError> {
     let size = data.len().into();
@@ -566,19 +618,103 @@ pub fn calldatasize(
     Ok(size)
 }
 
-pub fn calldatacopy(
+pub fn extcodesize(
+    stack: &mut Vec<U256>,
+    state: &State,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let address = pop(stack)?;
+    let code = state.get_code(address);
+
+    push_data_size(stack, &code, limit)
+}
+
+pub fn extcodecopy(
+    stack: &mut Vec<U256>,
+    state: &State,
+    memory: &mut Memory,
+) -> Result<(), ExecutionError> {
+    let address = pop(stack)?;
+    let code = state.get_code(address);
+
+    copy_data_to_memory(stack, memory, &code)
+}
+
+pub fn extcodehash(
+    stack: &mut Vec<U256>,
+    state: &State,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let address = pop(stack)?;
+    let code = state.get_code(address);
+
+    let result = sha3_hash(&code);
+
+    push(stack, result, limit)?;
+    Ok(result)
+}
+
+pub fn selfbalance(
+    stack: &mut Vec<U256>,
+    state: &State,
+    address: &[u8],
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let code = state.get_balance(address.into());
+
+    push_from_big_endian(stack, &code, limit)
+}
+
+pub fn sstore(
+    stack: &mut Vec<U256>,
+    storage: &mut Storage,
+    address: &[u8],
+) -> Result<U256, ExecutionError> {
+    let key = pop(stack)?;
+    let value = pop(stack)?;
+
+    storage.set_word(U256::from_big_endian(address), key, value);
+    Ok(value)
+}
+
+pub fn sload(
+    stack: &mut Vec<U256>,
+    storage: &Storage,
+    address: &[u8],
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let key = pop(stack)?;
+
+    let value = storage.load_word(U256::from_big_endian(address), key);
+    push(stack, value, limit)?;
+    Ok(value)
+}
+
+pub fn add_log(log: Log, logs: &mut Vec<Log>) -> Result<(), ExecutionError> {
+    logs.push(log);
+    Ok(())
+}
+
+pub fn logx(
+    x: usize,
     stack: &mut Vec<U256>,
     memory: &mut Memory,
-    data: &Vec<u8>,
+    address: &[u8],
+    logs: &mut Vec<Log>,
 ) -> Result<(), ExecutionError> {
-    let dest_offset = pop(stack)?.as_usize();
     let offset = pop(stack)?.as_usize();
     let size = pop(stack)?.as_usize();
+    let mut topics = vec![];
 
-    let data = &data[offset..offset + size];
-
-    for (i, byte) in data.iter().enumerate() {
-        memory.save_byte(dest_offset + i, *byte)?;
+    for _ in 0..x {
+        let topic = pop(stack)?;
+        topics.push(topic);
     }
+
+    let data = memory.get_bytes(offset, size)?;
+
+    let log = Log::new(U256::from_big_endian(address), data, topics);
+    add_log(log, logs)?;
+
     Ok(())
 }

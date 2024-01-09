@@ -40,4 +40,12 @@ impl State {
             .map(|elem| elem.data.balance.clone())
             .unwrap_or_default()
     }
+
+    pub fn get_code(&self, address: U256) -> Vec<u8> {
+        self.state
+            .iter()
+            .find(|elem| elem.address == address)
+            .map(|elem| elem.data.code.clone())
+            .unwrap_or_default()
+    }
 }

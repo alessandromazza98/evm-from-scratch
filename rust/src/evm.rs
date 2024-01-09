@@ -4,13 +4,16 @@ use crate::{
     memory::Memory,
     opcode::OpCode,
     state_data::State,
+    storage::Storage,
     tx_data::TxData,
     utility::{
-        add, addmod, and, balance, byte, calldatacopy, calldataload, calldatasize, div,
-        duplicate_data, eq, exp, gt, iszero, jump, lt, mload, mod_fn, msize, mstore, mstore8, mul,
-        mulmod, not, or, pop, push, push_data, push_from_big_endian, sar, sdiv, sgt, sha_3, shl,
-        shr, sign_extend, slt, smod, sub, swap_data, xor,
+        add, addmod, and, balance, byte, calldataload, copy_data_to_memory, div, duplicate_data,
+        eq, exp, extcodecopy, extcodehash, extcodesize, gt, iszero, jump, logx, lt, mload, mod_fn,
+        msize, mstore, mstore8, mul, mulmod, not, or, pop, push, push_data, push_data_size,
+        push_from_big_endian, sar, sdiv, selfbalance, sgt, sha_3, shl, shr, sign_extend, sload,
+        slt, smod, sstore, sub, swap_data, xor,
     },
+    Log,
 };
 use primitive_types::U256;
 
@@ -19,7 +22,9 @@ pub struct Evm {
     tx_data: TxData,
     block_data: BlockData,
     state: State,
+    storage: Storage,
     stack: Vec<U256>,
+    logs: Vec<Log>,
     memory: Memory,
     limit: usize,
 }
@@ -30,7 +35,9 @@ impl Evm {
         tx_data: TxData,
         block_data: BlockData,
         state: State,
+        storage: Storage,
         stack: Vec<U256>,
+        logs: Vec<Log>,
         memory: Memory,
         limit: usize,
     ) -> Self {
@@ -39,7 +46,9 @@ impl Evm {
             tx_data,
             block_data,
             state,
+            storage,
             stack,
+            logs,
             memory,
             limit,
         }
@@ -363,11 +372,54 @@ impl Evm {
                 Ok(())
             }
             OpCode::Calldatasize => {
-                calldatasize(&mut self.stack, &self.tx_data.data, self.limit)?;
+                push_data_size(&mut self.stack, &self.tx_data.data, self.limit)?;
                 Ok(())
             }
             OpCode::Calldatacopy => {
-                calldatacopy(&mut self.stack, &mut self.memory, &self.tx_data.data)?;
+                copy_data_to_memory(&mut self.stack, &mut self.memory, &self.tx_data.data)?;
+                Ok(())
+            }
+            OpCode::Codesize => {
+                push_data_size(&mut self.stack, &self.code, self.limit)?;
+                Ok(())
+            }
+            OpCode::Codecopy => {
+                copy_data_to_memory(&mut self.stack, &mut self.memory, &self.code)?;
+                Ok(())
+            }
+            OpCode::Extcodesize => {
+                extcodesize(&mut self.stack, &self.state, self.limit)?;
+                Ok(())
+            }
+            OpCode::Extcodecopy => {
+                extcodecopy(&mut self.stack, &self.state, &mut self.memory)?;
+                Ok(())
+            }
+            OpCode::Extcodehash => {
+                extcodehash(&mut self.stack, &self.state, self.limit)?;
+                Ok(())
+            }
+            OpCode::Selfbalance => {
+                selfbalance(&mut self.stack, &self.state, &self.tx_data.to, self.limit)?;
+                Ok(())
+            }
+            OpCode::Sstore => {
+                sstore(&mut self.stack, &mut self.storage, &self.tx_data.to)?;
+                Ok(())
+            }
+            OpCode::Sload => {
+                sload(&mut self.stack, &self.storage, &self.tx_data.to, self.limit)?;
+                Ok(())
+            }
+            OpCode::Log0 | OpCode::Log1 | OpCode::Log2 | OpCode::Log3 | OpCode::Log4 => {
+                let x = opcode.topics();
+                logx(
+                    x,
+                    &mut self.stack,
+                    &mut self.memory,
+                    &self.tx_data.to,
+                    &mut self.logs,
+                )?;
                 Ok(())
             }
         }
@@ -376,6 +428,11 @@ impl Evm {
     /// Returns the stack at the end of execution. Note that the stack here is reversed.
     pub fn stack(&self) -> Vec<U256> {
         self.stack.iter().rev().cloned().collect()
+    }
+
+    /// Returns the logs at the end of execution.
+    pub fn logs(&self) -> Vec<Log> {
+        self.logs.iter().rev().cloned().collect()
     }
 }
 

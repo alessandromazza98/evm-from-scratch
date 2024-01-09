@@ -55,7 +55,12 @@ opcodes! {
     Calldataload(53),
     Calldatasize(54),
     Calldatacopy(55),
+    Codesize(56),
+    Codecopy(57),
     Gasprice(58),
+    Extcodesize(59),
+    Extcodecopy(60),
+    Extcodehash(63),
     Blockhash(64),
     Coinbase(65),
     Timestamp(66),
@@ -63,10 +68,13 @@ opcodes! {
     Difficulty(68),
     Gaslimit(69),
     Chainid(70),
+    Selfbalance(71),
     Basfee(72),
     Mload(81),
     Mstore(82),
     Mstore8(83),
+    Sload(84),
+    Sstore(85),
     Jump(86),
     Jumpi(87),
     Pc(88),
@@ -138,6 +146,11 @@ opcodes! {
     Swap14(157),
     Swap15(158),
     Swap16(159),
+    Log0(160),
+    Log1(161),
+    Log2(162),
+    Log3(163),
+    Log4(164),
 }
 
 impl OpCode {
@@ -208,6 +221,18 @@ impl OpCode {
             OpCode::Dup15 | OpCode::Swap15 => 15,
             OpCode::Dup16 | OpCode::Swap16 => 16,
             _ => 0, // return 0 for non-`DUP` and non-`SWAP` opcodes
+        }
+    }
+
+    /// Helper function to determine the number of topics of a `LOG` opcode
+    pub fn topics(&self) -> usize {
+        match self {
+            OpCode::Log0 => 0,
+            OpCode::Log1 => 1,
+            OpCode::Log2 => 2,
+            OpCode::Log3 => 3,
+            OpCode::Log4 => 4,
+            _ => 0, // return 0 for non-`LOG`
         }
     }
 

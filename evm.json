@@ -1928,6 +1928,9 @@
       "asm": "PUSH1 1\nPUSH1 0\nSSTORE\nPUSH1 0\nSLOAD",
       "bin": "6001600055600054"
     },
+    "tx": {
+      "to": "0x1e79b045dc29eae9fdc69673c9dcd7c53e5e159d"
+    },
     "expect": {
       "stack": [
         "0x1"
