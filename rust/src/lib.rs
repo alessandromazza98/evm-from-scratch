@@ -26,6 +26,7 @@ pub struct EvmResult {
     pub stack: Vec<U256>,
     pub logs: Vec<Log>,
     pub success: bool,
+    pub ret: Vec<u8>,
 }
 
 pub fn evm(
@@ -50,8 +51,11 @@ pub fn evm(
         storage,
         vec![],
         vec![],
+        vec![],
+        vec![],
         Memory::new(),
         limit,
+        false,
     );
 
     let result = evm.execute();
@@ -61,16 +65,19 @@ pub fn evm(
             stack: evm.stack(),
             logs: evm.logs(),
             success: true,
+            ret: evm.return_data(),
         },
         ExecutionResult::Revert => EvmResult {
             stack: evm.stack(),
             logs: evm.logs(),
             success: false,
+            ret: evm.return_data(),
         },
         ExecutionResult::Halt => EvmResult {
             stack: evm.stack(),
             logs: evm.logs(),
             success: true,
+            ret: evm.return_data(),
         },
     }
 }

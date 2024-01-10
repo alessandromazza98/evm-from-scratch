@@ -74,8 +74,8 @@ struct Expect {
     stack: Option<Vec<String>>,
     success: bool,
     logs: Option<Vec<LogRaw>>,
-    // #[serde(rename = "return")]
-    // ret: Option<String>,
+    #[serde(rename = "return")]
+    ret: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -258,6 +258,17 @@ fn main() {
 
         matching = matching && result.success == test.expect.success;
 
+        let mut expected_ret = vec![];
+        match &test.expect.ret {
+            Some(ret) => {
+                let ret = hex::decode(format!("{}", &ret)).unwrap();
+                expected_ret = ret;
+            }
+            None => {}
+        };
+
+        matching = matching && result.ret == expected_ret;
+
         if !matching {
             println!("Instructions: \n{}\n", test.code.asm);
 
@@ -273,6 +284,9 @@ fn main() {
             }
             println!("]\n");
 
+            println!("Expected return data:");
+            println!("{:#?}", expected_ret);
+
             println!("Actual success: {:?}", result.success);
             println!("Actual stack: [");
             for v in result.stack {
@@ -284,6 +298,9 @@ fn main() {
                 println!("  {:#?},", l);
             }
             println!("]\n");
+
+            println!("Actual return data:");
+            println!("{:#?}", result.ret);
 
             println!("\nHint: {}\n", test.hint);
             println!("Progress: {}/{}\n\n", index, total);

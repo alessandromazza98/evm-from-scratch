@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use primitive_types::U256;
 
 /// Storage of a contract.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Storage {
     /// The mapping between the contract address and its storage.
     pub store: HashMap<U256, StorageData>,
 }
 
 /// Storage data for a contract.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StorageData {
     /// Mapping between storage slot and value.
     pub data: HashMap<U256, U256>,

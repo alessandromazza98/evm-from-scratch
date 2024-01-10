@@ -7,11 +7,12 @@ use crate::{
     storage::Storage,
     tx_data::TxData,
     utility::{
-        add, addmod, and, balance, byte, calldataload, copy_data_to_memory, div, duplicate_data,
-        eq, exp, extcodecopy, extcodehash, extcodesize, gt, iszero, jump, logx, lt, mload, mod_fn,
-        msize, mstore, mstore8, mul, mulmod, not, or, pop, push, push_data, push_data_size,
-        push_from_big_endian, sar, sdiv, selfbalance, sgt, sha_3, shl, shr, sign_extend, sload,
-        slt, smod, sstore, sub, swap_data, xor,
+        add, addmod, and, balance, byte, call, calldataload, copy_data_to_memory, delegatecall,
+        div, duplicate_data, eq, exp, extcodecopy, extcodehash, extcodesize, gt, iszero, jump,
+        logx, lt, mload, mod_fn, msize, mstore, mstore8, mul, mulmod, not, or, pop, push,
+        push_data, push_data_size, push_from_big_endian, return_func, revert, sar, sdiv,
+        selfbalance, sgt, sha_3, shl, shr, sign_extend, sload, slt, smod, sstore, staticcall, sub,
+        swap_data, xor,
     },
     Log,
 };
@@ -25,8 +26,11 @@ pub struct Evm {
     storage: Storage,
     stack: Vec<U256>,
     logs: Vec<Log>,
+    return_data: Vec<u8>,
+    last_return_data: Vec<u8>,
     memory: Memory,
     limit: usize,
+    read_only: bool,
 }
 
 impl Evm {
@@ -38,8 +42,11 @@ impl Evm {
         storage: Storage,
         stack: Vec<U256>,
         logs: Vec<Log>,
+        return_data: Vec<u8>,
+        last_return_data: Vec<u8>,
         memory: Memory,
         limit: usize,
+        read_only: bool,
     ) -> Self {
         Self {
             code,
@@ -49,8 +56,11 @@ impl Evm {
             storage,
             stack,
             logs,
+            return_data,
+            last_return_data,
             memory,
             limit,
+            read_only,
         }
     }
 
@@ -404,7 +414,12 @@ impl Evm {
                 Ok(())
             }
             OpCode::Sstore => {
-                sstore(&mut self.stack, &mut self.storage, &self.tx_data.to)?;
+                sstore(
+                    &mut self.stack,
+                    &mut self.storage,
+                    &self.tx_data.to,
+                    self.read_only,
+                )?;
                 Ok(())
             }
             OpCode::Sload => {
@@ -419,6 +434,66 @@ impl Evm {
                     &mut self.memory,
                     &self.tx_data.to,
                     &mut self.logs,
+                    self.read_only,
+                )?;
+                Ok(())
+            }
+            OpCode::Return => {
+                return_func(&mut self.stack, &mut self.memory, &mut self.return_data)?;
+                Err(ExecutionError::Halt)
+            }
+            OpCode::Revert => {
+                revert(&mut self.stack, &mut self.memory, &mut self.return_data)?;
+                Err(ExecutionError::Revert)
+            }
+            OpCode::Call => {
+                call(
+                    &mut self.stack,
+                    &mut self.memory,
+                    &mut self.state,
+                    &mut self.storage,
+                    &self.tx_data.to,
+                    &self.tx_data.origin,
+                    &mut self.last_return_data,
+                    self.limit,
+                    self.read_only,
+                )?;
+                Ok(())
+            }
+            OpCode::Returndatasize => {
+                push_data_size(&mut self.stack, &self.last_return_data, self.limit)?;
+                Ok(())
+            }
+            OpCode::Returndatacopy => {
+                copy_data_to_memory(&mut self.stack, &mut self.memory, &self.last_return_data)?;
+                Ok(())
+            }
+            OpCode::Delegatecall => {
+                delegatecall(
+                    &mut self.stack,
+                    &mut self.memory,
+                    &mut self.state,
+                    &mut self.storage,
+                    &self.tx_data.to,
+                    &self.tx_data.from,
+                    &self.tx_data.origin,
+                    &self.tx_data.value,
+                    &mut self.last_return_data,
+                    self.limit,
+                )?;
+                Ok(())
+            }
+            OpCode::Staticcall => {
+                staticcall(
+                    &mut self.stack,
+                    &mut self.memory,
+                    &mut self.state,
+                    &mut self.storage,
+                    &self.tx_data.to,
+                    &self.tx_data.origin,
+                    &self.tx_data.value,
+                    &mut self.last_return_data,
+                    self.limit,
                 )?;
                 Ok(())
             }
@@ -433,6 +508,18 @@ impl Evm {
     /// Returns the logs at the end of execution.
     pub fn logs(&self) -> Vec<Log> {
         self.logs.iter().rev().cloned().collect()
+    }
+
+    pub fn return_data(&self) -> Vec<u8> {
+        self.return_data.clone()
+    }
+
+    pub fn state(&self) -> State {
+        self.state.clone()
+    }
+
+    pub fn storage(&self) -> Storage {
+        self.storage.clone()
     }
 }
 

@@ -45,6 +45,14 @@ impl Memory {
         Ok(byte)
     }
 
+    pub fn save_bytes(&mut self, offset: usize, bytes: &[u8]) -> Result<(), ExecutionError> {
+        for i in 0..bytes.len() {
+            self.save_byte(offset + i, bytes[i])?;
+        }
+
+        Ok(())
+    }
+
     pub fn get_byte(&mut self, offset: usize) -> Result<u8, ExecutionError> {
         // memory must have at least offset free bytes left.
         self.resize(offset, 1)?;

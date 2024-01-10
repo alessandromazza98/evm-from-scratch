@@ -1,6 +1,13 @@
 use crate::{
-    errors::ExecutionError, jumpdest::valid_jumpdest, memory::Memory, state_data::State,
-    storage::Storage, Log,
+    block_data::BlockData,
+    errors::ExecutionError,
+    evm::{Evm, ExecutionResult},
+    jumpdest::valid_jumpdest,
+    memory::Memory,
+    state_data::State,
+    storage::Storage,
+    tx_data::TxData,
+    Log,
 };
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
@@ -669,7 +676,11 @@ pub fn sstore(
     stack: &mut Vec<U256>,
     storage: &mut Storage,
     address: &[u8],
+    read_only: bool,
 ) -> Result<U256, ExecutionError> {
+    if read_only {
+        return Err(ExecutionError::ReadOnly);
+    }
     let key = pop(stack)?;
     let value = pop(stack)?;
 
@@ -701,7 +712,11 @@ pub fn logx(
     memory: &mut Memory,
     address: &[u8],
     logs: &mut Vec<Log>,
+    read_only: bool,
 ) -> Result<(), ExecutionError> {
+    if read_only {
+        return Err(ExecutionError::ReadOnly);
+    }
     let offset = pop(stack)?.as_usize();
     let size = pop(stack)?.as_usize();
     let mut topics = vec![];
@@ -717,4 +732,233 @@ pub fn logx(
     add_log(log, logs)?;
 
     Ok(())
+}
+
+pub fn return_func(
+    stack: &mut Vec<U256>,
+    memory: &mut Memory,
+    return_data: &mut Vec<u8>,
+) -> Result<(), ExecutionError> {
+    let offset = pop(stack)?.as_usize();
+    let size = pop(stack)?.as_usize();
+
+    let data = memory.get_bytes(offset, size)?;
+    *return_data = data;
+
+    Ok(())
+}
+
+pub fn revert(
+    stack: &mut Vec<U256>,
+    memory: &mut Memory,
+    return_data: &mut Vec<u8>,
+) -> Result<(), ExecutionError> {
+    return_func(stack, memory, return_data)?;
+    stack.clear();
+
+    Ok(())
+}
+
+pub fn call(
+    stack: &mut Vec<U256>,
+    memory: &mut Memory,
+    state: &mut State,
+    storage: &mut Storage,
+    tx_to: &[u8],
+    tx_origin: &[u8],
+    last_ret_data: &mut Vec<u8>,
+    limit: usize,
+    read_only: bool,
+) -> Result<U256, ExecutionError> {
+    let _gas = pop(stack)?;
+    let address = pop(stack)?;
+    let value = pop(stack)?;
+
+    if read_only && !value.is_zero() {
+        return Err(ExecutionError::ReadOnly);
+    }
+
+    let args_offset = pop(stack)?.as_usize();
+    let args_size = pop(stack)?.as_usize();
+    let ret_offset = pop(stack)?.as_usize();
+    let _ret_size = pop(stack)?.as_usize();
+
+    let code = state.get_code(address);
+    let calldata = memory.get_bytes(args_offset, args_size)?;
+    let mut to = [0u8; 32];
+    address.to_big_endian(&mut to);
+    let mut value_bytes = [0u8; 32];
+    value.to_big_endian(&mut value_bytes);
+    let tx_data = TxData::new(vec![
+        to.to_vec(),
+        tx_to.to_vec(),
+        tx_origin.to_vec(),
+        vec![],
+        value_bytes.to_vec(),
+        calldata,
+    ]);
+    let block_data = BlockData::new(vec![]);
+
+    let mut new_evm = Evm::new(
+        Box::from(code),
+        tx_data,
+        block_data,
+        state.clone(),
+        storage.clone(),
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        Memory::new(),
+        limit,
+        false,
+    );
+
+    let result = new_evm.execute();
+
+    memory.save_bytes(ret_offset, &new_evm.return_data())?;
+    *last_ret_data = new_evm.return_data();
+
+    let res = match result {
+        ExecutionResult::Success | ExecutionResult::Halt => {
+            *state = new_evm.state();
+            *storage = new_evm.storage();
+            1.into()
+        }
+        ExecutionResult::Revert => 0.into(),
+    };
+
+    push(stack, res, limit)?;
+    Ok(res)
+}
+
+pub fn delegatecall(
+    stack: &mut Vec<U256>,
+    memory: &mut Memory,
+    state: &mut State,
+    storage: &mut Storage,
+    tx_to: &[u8],
+    tx_from: &[u8],
+    tx_origin: &[u8],
+    value: &[u8],
+    last_ret_data: &mut Vec<u8>,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let _gas = pop(stack)?;
+    let address = pop(stack)?;
+    let args_offset = pop(stack)?.as_usize();
+    let args_size = pop(stack)?.as_usize();
+    let ret_offset = pop(stack)?.as_usize();
+    let _ret_size = pop(stack)?.as_usize();
+
+    let code = state.get_code(address);
+    let calldata = memory.get_bytes(args_offset, args_size)?;
+    let mut to = [0u8; 32];
+    address.to_big_endian(&mut to);
+    let tx_data = TxData::new(vec![
+        tx_to.to_vec(),
+        tx_from.to_vec(),
+        tx_origin.to_vec(),
+        vec![],
+        value.to_vec(),
+        calldata,
+    ]);
+    let block_data = BlockData::new(vec![]);
+
+    let mut new_evm = Evm::new(
+        Box::from(code),
+        tx_data,
+        block_data,
+        state.clone(),
+        storage.clone(),
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        Memory::new(),
+        limit,
+        false,
+    );
+
+    let result = new_evm.execute();
+
+    memory.save_bytes(ret_offset, &new_evm.return_data())?;
+    *last_ret_data = new_evm.return_data();
+
+    let res = match result {
+        ExecutionResult::Success | ExecutionResult::Halt => {
+            *state = new_evm.state();
+            *storage = new_evm.storage();
+            1.into()
+        }
+        ExecutionResult::Revert => 0.into(),
+    };
+
+    push(stack, res, limit)?;
+    Ok(res)
+}
+
+pub fn staticcall(
+    stack: &mut Vec<U256>,
+    memory: &mut Memory,
+    state: &mut State,
+    storage: &mut Storage,
+    tx_to: &[u8],
+    tx_origin: &[u8],
+    tx_value: &[u8],
+    last_ret_data: &mut Vec<u8>,
+    limit: usize,
+) -> Result<U256, ExecutionError> {
+    let _gas = pop(stack)?;
+    let address = pop(stack)?;
+    let args_offset = pop(stack)?.as_usize();
+    let args_size = pop(stack)?.as_usize();
+    let ret_offset = pop(stack)?.as_usize();
+    let _ret_size = pop(stack)?.as_usize();
+
+    let code = state.get_code(address);
+    let calldata = memory.get_bytes(args_offset, args_size)?;
+    let mut to = [0u8; 32];
+    address.to_big_endian(&mut to);
+    let tx_data = TxData::new(vec![
+        to.to_vec(),
+        tx_to.to_vec(),
+        tx_origin.to_vec(),
+        vec![],
+        tx_value.to_vec(),
+        calldata,
+    ]);
+    let block_data = BlockData::new(vec![]);
+
+    let mut new_evm = Evm::new(
+        Box::from(code),
+        tx_data,
+        block_data,
+        state.clone(),
+        storage.clone(),
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        Memory::new(),
+        limit,
+        true,
+    );
+
+    let result = new_evm.execute();
+
+    memory.save_bytes(ret_offset, &new_evm.return_data())?;
+    *last_ret_data = new_evm.return_data();
+
+    let res = match result {
+        ExecutionResult::Success | ExecutionResult::Halt => {
+            *state = new_evm.state();
+            *storage = new_evm.storage();
+            1.into()
+        }
+        ExecutionResult::Revert => 0.into(),
+    };
+
+    push(stack, res, limit)?;
+    Ok(res)
 }

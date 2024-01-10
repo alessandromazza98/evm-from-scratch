@@ -60,6 +60,8 @@ opcodes! {
     Gasprice(58),
     Extcodesize(59),
     Extcodecopy(60),
+    Returndatasize(61),
+    Returndatacopy(62),
     Extcodehash(63),
     Blockhash(64),
     Coinbase(65),
@@ -151,6 +153,11 @@ opcodes! {
     Log2(162),
     Log3(163),
     Log4(164),
+    Call(241),
+    Return(243),
+    Delegatecall(244),
+    Staticcall(250),
+    Revert(253),
 }
 
 impl OpCode {
