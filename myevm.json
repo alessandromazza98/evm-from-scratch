@@ -1,23 +1,17 @@
 [
   {
-    "name": "STATICCALL",
-    "hint": "Like CALL, but disable state modifications",
-    "state": {
-      "0x1000000000000000000000000000000000000c42": {
-        "code": {
-          "asm": "PUSH1 0x42\nPUSH1 0\nMSTORE\nPUSH1 1\nPUSH1 31\nRETURN",
-          "bin": "60426000526001601ff3"
-        }
-      }
+    "name": "CREATE (empty)",
+    "hint": "Read \"Creating new contracts\" section of the course learning materials. This code creates a new empty account with balance 9",
+    "tx": {
+      "to": "0x9bbfed6889322e016e0a02ee459d306fc19545d8"
     },
     "code": {
-      "asm": "PUSH1 1\nPUSH1 31\nPUSH1 0\nPUSH1 0\nPUSH20 0x1000000000000000000000000000000000000c42\nPUSH1 0\nSTATICCALL\nPUSH1 0\nMLOAD",
-      "bin": "6001601f60006000731000000000000000000000000000000000000c426000fa600051"
+      "asm": "PUSH1 0\nPUSH1 0\nPUSH1 9\nCREATE\nBALANCE",
+      "bin": "600060006009f031"
     },
     "expect": {
       "stack": [
-        "0x42",
-        "0x1"
+        "0x9"
       ],
       "success": true
     }

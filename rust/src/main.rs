@@ -65,6 +65,7 @@ struct StateRaw {
 
 #[derive(Debug, Deserialize)]
 struct AddressData {
+    nonce: Option<String>,
     balance: Option<String>,
     code: Option<Code>,
 }
@@ -185,6 +186,12 @@ fn main() {
             let mut state_map = HashMap::new();
             for (address, data) in &state.state {
                 let address = hex::decode(format!("{:0>64}", &address[2..])).unwrap();
+                let nonce = &data
+                    .nonce
+                    .clone()
+                    .unwrap_or(0.to_string())
+                    .parse::<usize>()
+                    .unwrap();
                 let balance = hex::decode(format!(
                     "{:0>64}",
                     &data.balance.as_ref().unwrap_or(&String::from("aa"))[2..]
@@ -201,7 +208,7 @@ fn main() {
                         .bin,
                 )
                 .unwrap();
-                state_map.insert(address, (balance, code));
+                state_map.insert(address, (nonce.clone(), balance, code));
             }
             state_map
         } else {

@@ -516,16 +516,16 @@ pub fn sha_3(
 
     let value = &memory.store[offset..(offset + size)];
 
-    let result = sha3_hash(&value);
+    let result = U256::from_big_endian(&sha3_hash(&value));
 
     push(stack, result, limit)?;
 
     Ok(result)
 }
 
-pub fn sha3_hash(data: &[u8]) -> U256 {
+pub fn sha3_hash(data: &[u8]) -> [u8; 32] {
     if data.is_empty() {
-        let result = 0.into();
+        let result = [0; 32];
         result
     } else {
         // create hash
@@ -533,9 +533,7 @@ pub fn sha3_hash(data: &[u8]) -> U256 {
         hasher.update(data);
         let result = hasher.finalize();
 
-        // convert into U256
-        let result = U256::from_big_endian(&result);
-        result
+        result.into()
     }
 }
 
@@ -553,8 +551,10 @@ pub fn push_from_big_endian(
 pub fn balance(stack: &mut Vec<U256>, state: &State, limit: usize) -> Result<U256, ExecutionError> {
     let address = pop(stack)?;
     let balance = state.get_balance(address);
+    let mut balance_bytes = [0u8; 32];
+    balance.to_big_endian(&mut balance_bytes);
 
-    push_from_big_endian(stack, &balance, limit)
+    push_from_big_endian(stack, &balance_bytes, limit)
 }
 
 pub fn calldataload(
@@ -655,7 +655,7 @@ pub fn extcodehash(
     let address = pop(stack)?;
     let code = state.get_code(address);
 
-    let result = sha3_hash(&code);
+    let result = sha3_hash(&code).into();
 
     push(stack, result, limit)?;
     Ok(result)
@@ -667,9 +667,11 @@ pub fn selfbalance(
     address: &[u8],
     limit: usize,
 ) -> Result<U256, ExecutionError> {
-    let code = state.get_balance(address.into());
+    let balance = state.get_balance(address.into());
+    let mut balance_bytes = [0u8; 32];
+    balance.to_big_endian(&mut balance_bytes);
 
-    push_from_big_endian(stack, &code, limit)
+    push_from_big_endian(stack, &balance_bytes, limit)
 }
 
 pub fn sstore(
@@ -961,4 +963,104 @@ pub fn staticcall(
 
     push(stack, res, limit)?;
     Ok(res)
+}
+
+pub fn create(
+    stack: &mut Vec<U256>,
+    memory: &mut Memory,
+    state: &mut State,
+    storage: &mut Storage,
+    tx_to: &[u8],
+    tx_origin: &[u8],
+    last_ret_data: &mut Vec<u8>,
+    limit: usize,
+    read_only: bool,
+) -> Result<U256, ExecutionError> {
+    if read_only {
+        return Err(ExecutionError::ReadOnly);
+    }
+
+    let value = pop(stack)?;
+    let offset = pop(stack)?.as_usize();
+    let size = pop(stack)?.as_usize();
+
+    let code = memory.get_bytes(offset, size)?;
+    let address = U256::from_big_endian(tx_to);
+    let nonce = state.get_nonce(address);
+
+    let contract_address = calculate_address(tx_to, nonce);
+    let mut contract_address_bytes = [0u8; 32];
+    contract_address.to_big_endian(&mut contract_address_bytes);
+
+    let mut value_bytes = [0u8; 32];
+    value.to_big_endian(&mut value_bytes);
+
+    let tx_data = TxData::new(vec![
+        contract_address_bytes.to_vec(),
+        tx_to.to_vec(),
+        tx_origin.to_vec(),
+        vec![],
+        value_bytes.to_vec(),
+        vec![],
+    ]);
+    let block_data = BlockData::new(vec![]);
+
+    let mut new_evm = Evm::new(
+        Box::from(code),
+        tx_data,
+        block_data,
+        state.clone(),
+        storage.clone(),
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        Memory::new(),
+        limit,
+        false,
+    );
+
+    let result = new_evm.execute();
+
+    let res = match result {
+        ExecutionResult::Success | ExecutionResult::Halt => {
+            *state = new_evm.state();
+            *storage = new_evm.storage();
+
+            state.save_code(contract_address, new_evm.return_data(), value)?;
+            *last_ret_data = new_evm.return_data();
+            contract_address
+        }
+        ExecutionResult::Revert => 0.into(),
+    };
+
+    push(stack, res, limit)?;
+    Ok(res)
+}
+
+pub fn calculate_address(sender_address: &[u8], nonce: usize) -> U256 {
+    // no rlp encoding here... in a REAL EVM you should rlp encode [sender_address + nonce] before hashing
+    let result = sha3_hash(&[sender_address, &nonce.to_be_bytes()].concat()).to_vec();
+    let result = result.get(12..).unwrap_or(&[0_u8; 20]);
+    let result = U256::from_big_endian(&result);
+
+    result
+}
+
+pub fn selfdestruct(
+    stack: &mut Vec<U256>,
+    state: &mut State,
+    tx_to: &[u8],
+    read_only: bool,
+) -> Result<(), ExecutionError> {
+    if read_only {
+        return Err(ExecutionError::ReadOnly);
+    }
+    let dest_address = pop(stack)?;
+    let src_address = U256::from_big_endian(tx_to);
+
+    let balance = state.get_balance(src_address);
+    state.transfer_balance(balance, dest_address);
+    state.delete_account(src_address);
+    Ok(())
 }

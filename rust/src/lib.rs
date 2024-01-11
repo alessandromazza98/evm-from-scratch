@@ -33,7 +33,7 @@ pub fn evm(
     _code: impl AsRef<[u8]>,
     _tx_data: Vec<Vec<u8>>,
     _block_data: Vec<Vec<u8>>,
-    _state_data: HashMap<Vec<u8>, (Vec<u8>, Vec<u8>)>,
+    _state_data: HashMap<Vec<u8>, (usize, Vec<u8>, Vec<u8>)>,
 ) -> EvmResult {
     let code = _code.as_ref();
     let limit = 1024;

@@ -7,12 +7,12 @@ use crate::{
     storage::Storage,
     tx_data::TxData,
     utility::{
-        add, addmod, and, balance, byte, call, calldataload, copy_data_to_memory, delegatecall,
-        div, duplicate_data, eq, exp, extcodecopy, extcodehash, extcodesize, gt, iszero, jump,
-        logx, lt, mload, mod_fn, msize, mstore, mstore8, mul, mulmod, not, or, pop, push,
-        push_data, push_data_size, push_from_big_endian, return_func, revert, sar, sdiv,
-        selfbalance, sgt, sha_3, shl, shr, sign_extend, sload, slt, smod, sstore, staticcall, sub,
-        swap_data, xor,
+        add, addmod, and, balance, byte, call, calldataload, copy_data_to_memory, create,
+        delegatecall, div, duplicate_data, eq, exp, extcodecopy, extcodehash, extcodesize, gt,
+        iszero, jump, logx, lt, mload, mod_fn, msize, mstore, mstore8, mul, mulmod, not, or, pop,
+        push, push_data, push_data_size, push_from_big_endian, return_func, revert, sar, sdiv,
+        selfbalance, selfdestruct, sgt, sha_3, shl, shr, sign_extend, sload, slt, smod, sstore,
+        staticcall, sub, swap_data, xor,
     },
     Log,
 };
@@ -494,6 +494,29 @@ impl Evm {
                     &self.tx_data.value,
                     &mut self.last_return_data,
                     self.limit,
+                )?;
+                Ok(())
+            }
+            OpCode::Create => {
+                create(
+                    &mut self.stack,
+                    &mut self.memory,
+                    &mut self.state,
+                    &mut self.storage,
+                    &self.tx_data.to,
+                    &self.tx_data.origin,
+                    &mut self.last_return_data,
+                    self.limit,
+                    self.read_only,
+                )?;
+                Ok(())
+            }
+            OpCode::Selfdestruct => {
+                selfdestruct(
+                    &mut self.stack,
+                    &mut self.state,
+                    &self.tx_data.to,
+                    self.read_only,
                 )?;
                 Ok(())
             }

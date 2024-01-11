@@ -20,4 +20,6 @@ pub enum ExecutionError {
     Revert,
     #[error("execution is read only")]
     ReadOnly,
+    #[error("contract address already present")]
+    ContractAddressCollision,
 }

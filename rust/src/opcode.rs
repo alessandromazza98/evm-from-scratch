@@ -153,11 +153,13 @@ opcodes! {
     Log2(162),
     Log3(163),
     Log4(164),
+    Create(240),
     Call(241),
     Return(243),
     Delegatecall(244),
     Staticcall(250),
     Revert(253),
+    Selfdestruct(255),
 }
 
 impl OpCode {
